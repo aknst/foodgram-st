@@ -5,7 +5,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from django.contrib.auth import get_user_model
 from rest_framework.authtoken.models import Token
 from rest_framework.pagination import PageNumberPagination
-from .serializers import UserSerializer, TokenSerializer
+from .serializers import UserSerializer, TokenSerializer, PasswordResetSerializer
 
 User = get_user_model()
 
@@ -93,6 +93,36 @@ class CurrentUserView(APIView):
         """Retrieve current authenticated user"""
         serializer = UserSerializer(request.user, context={"request": request})
         return Response(serializer.data)
+
+
+class PasswordResetView(APIView):
+    """View for password reset"""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        """Update user's password"""
+        serializer = PasswordResetSerializer(data=request.data)
+        if serializer.is_valid():
+            current_password = serializer.validated_data.get('current_password')
+            new_password = serializer.validated_data.get('new_password')
+
+            # Check if current password is correct
+            if not request.user.check_password(current_password):
+                return Response(
+                    {"current_password": ["Current password is incorrect"]},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Update password
+            request.user.set_password(new_password)
+            request.user.save()
+
+            # Invalidate existing token
+            Token.objects.filter(user=request.user).delete()
+
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class AvatarView(APIView):
