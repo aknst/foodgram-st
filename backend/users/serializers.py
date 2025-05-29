@@ -4,6 +4,7 @@ from django.core.validators import RegexValidator
 from django.utils.translation import gettext_lazy as _
 from rest_framework.authtoken.models import Token
 from rest_framework.validators import UniqueValidator
+from .fields import Base64ImageField
 import re
 
 User = get_user_model()
@@ -44,10 +45,26 @@ class UserSerializer(serializers.ModelSerializer):
         write_only=True, required=True, style={"input_type": "password"}
     )
 
+    avatar = Base64ImageField(required=False, allow_null=True)
+
     class Meta:
         model = User
-        fields = ("id", "username", "email", "first_name", "last_name", "password")
+        fields = (
+            "id",
+            "username",
+            "email",
+            "first_name",
+            "last_name",
+            "password",
+            "avatar",
+        )
         extra_kwargs = {"password": {"write_only": True}}
+
+    def to_representation(self, instance):
+        """Add is_subscribed field for user list view"""
+        representation = super().to_representation(instance)
+        representation['is_subscribed'] = False
+        return representation
 
     def validate_username(self, value):
         """Validate username format"""
