@@ -2,12 +2,28 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from ingredients.models import Ingredient
 from .models import Recipe, RecipeIngredient
-import base64
 import uuid
+import base64
 from django.core.files.base import ContentFile
 from users.serializers import UserSerializer as UserSerializer
 
 User = get_user_model()
+
+
+class RecipeLinkSerializer(serializers.Serializer):
+    short_link = serializers.SerializerMethodField()
+
+    def encode_id(self, id):
+        # Convert ID to hexadecimal string
+        hex_str = f"{id:x}"  # Convert to hex without '0x' prefix
+        return hex_str.zfill(2)  # Ensure at least 2 digits
+
+    def get_short_link(self, obj):
+        short_code = self.encode_id(obj.id)
+        return f"/s/{short_code}"
+
+    def to_representation(self, instance):
+        return {"short-link": self.get_short_link(instance)}
 
 
 class Base64ImageField(serializers.ImageField):
@@ -45,7 +61,6 @@ class IngredientInRecipeSerializer(serializers.ModelSerializer):
         return value
 
     def to_representation(self, instance):
-        # If instance is a RecipeIngredient
         if isinstance(instance, RecipeIngredient):
             return {
                 "id": instance.ingredient_id,
@@ -54,7 +69,6 @@ class IngredientInRecipeSerializer(serializers.ModelSerializer):
                 "amount": instance.amount,
             }
 
-        # If instance is a dictionary (during creation)
         return instance
 
 
@@ -75,7 +89,7 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
     def validate_ingredients(self, value):
         if not value:
             raise serializers.ValidationError("Ingredients list cannot be empty")
-        
+
         ingredients = []
         for item in value:
             ingredient = Ingredient.objects.filter(id=item["id"]).first()
@@ -93,12 +107,9 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         ingredients = validated_data.pop("ingredients")
 
-        # Create recipe with author and other data
         recipe = Recipe.objects.create(
             author=self.context["request"].user, **validated_data
         )
-
-        # Create recipe-ingredient relationships
         for ingredient_data in ingredients:
             RecipeIngredient.objects.create(
                 recipe=recipe,
@@ -106,12 +117,9 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
                 amount=ingredient_data["amount"],
             )
 
-        # Use RecipeListSerializer to return the full response
         serializer = RecipeListSerializer(
-            recipe, 
-            context={"request": self.context.get("request")}
+            recipe, context={"request": self.context.get("request")}
         )
-        # Return the serializer instance instead of just the data
         return serializer
 
 
@@ -150,7 +158,6 @@ class RecipeListSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
-        # Ensure all fields match the schema exactly
         author_data = UserSerializer(instance.author, context=self.context).data
         data["author"] = {
             "id": author_data["id"],

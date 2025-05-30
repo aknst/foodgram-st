@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from .models import Recipe
-from .serializers import RecipeCreateSerializer, RecipeListSerializer
+from .serializers import RecipeCreateSerializer, RecipeListSerializer, RecipeLinkSerializer
 from .filters import RecipeFilter
 from .pagination import CustomPagination
 
@@ -97,3 +97,9 @@ class RecipeViewSet(viewsets.ModelViewSet):
     def download_shopping_cart(self, request):
         # TODO: Implement shopping cart download
         pass
+
+    @action(detail=True, methods=["get"], url_path="get-link")
+    def get_link(self, request, pk=None):
+        recipe = self.get_object()
+        serializer = RecipeLinkSerializer(recipe)
+        return Response(serializer.data)
