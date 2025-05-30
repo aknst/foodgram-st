@@ -5,13 +5,16 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from .models import Recipe
 from .serializers import RecipeCreateSerializer, RecipeListSerializer
+from .filters import RecipeFilter
+from .pagination import CustomPagination
 
 
 class RecipeViewSet(viewsets.ModelViewSet):
     queryset = Recipe.objects.all()
     filter_backends = [DjangoFilterBackend, SearchFilter]
-    filterset_fields = ["author", "is_favorited", "is_in_shopping_cart"]
+    filterset_class = RecipeFilter
     search_fields = ["name"]
+    pagination_class = CustomPagination
 
     def get_serializer_class(self):
         if self.action in ["create", "partial_update"]:
@@ -48,8 +51,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
             # Serialize the paginated page
             serializer = self.get_serializer(page, many=True)
             # Return paginated response with proper format
-            response = self.get_paginated_response(serializer.data)
-            return response
+            return self.get_paginated_response(serializer.data)
 
         # If no pagination
         serializer = self.get_serializer(queryset, many=True)
