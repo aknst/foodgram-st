@@ -14,9 +14,8 @@ class RecipeLinkSerializer(serializers.Serializer):
     short_link = serializers.SerializerMethodField()
 
     def encode_id(self, id):
-        # Convert ID to hexadecimal string
-        hex_str = f"{id:x}"  # Convert to hex without '0x' prefix
-        return hex_str.zfill(2)  # Ensure at least 2 digits
+        hex_str = f"{id:x}"
+        return hex_str.zfill(2)
 
     def get_short_link(self, obj):
         short_code = self.encode_id(obj.id)
@@ -29,14 +28,9 @@ class RecipeLinkSerializer(serializers.Serializer):
 class Base64ImageField(serializers.ImageField):
     def to_internal_value(self, data):
         if isinstance(data, str) and data.startswith("data:image"):
-            # Remove the data:image/png;base64, prefix
             format, imgstr = data.split(";base64,")
             ext = format.split("/")[-1]
-
-            # Generate a unique filename
             filename = f"{uuid.uuid4()}.{ext}"
-
-            # Decode the base64 string
             data = ContentFile(base64.b64decode(imgstr), name=filename)
         return super().to_internal_value(data)
 
@@ -103,6 +97,36 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
                 )
             ingredients.append(ingredient)
         return value
+
+    def validate(self, data):
+        if self.instance and not data.get("ingredients"):
+            raise serializers.ValidationError(
+                {"ingredients": ["This field is required"]}
+            )
+        return data
+
+    def update(self, instance, validated_data):
+        instance.name = validated_data.get("name", instance.name)
+        instance.text = validated_data.get("text", instance.text)
+        instance.cooking_time = validated_data.get(
+            "cooking_time", instance.cooking_time
+        )
+
+        image = validated_data.get("image")
+        if image:
+            instance.image = image
+        ingredients = validated_data.get("ingredients")
+        if ingredients:
+            RecipeIngredient.objects.filter(recipe=instance).delete()
+            for ingredient_data in ingredients:
+                RecipeIngredient.objects.create(
+                    recipe=instance,
+                    ingredient_id=ingredient_data["id"],
+                    amount=ingredient_data["amount"],
+                )
+
+        instance.save()
+        return instance
 
     def create(self, validated_data):
         ingredients = validated_data.pop("ingredients")

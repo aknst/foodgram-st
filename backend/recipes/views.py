@@ -4,7 +4,11 @@ from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
 from .models import Recipe
-from .serializers import RecipeCreateSerializer, RecipeListSerializer, RecipeLinkSerializer
+from .serializers import (
+    RecipeCreateSerializer,
+    RecipeListSerializer,
+    RecipeLinkSerializer,
+)
 from .filters import RecipeFilter
 from .pagination import CustomPagination
 
@@ -42,18 +46,37 @@ class RecipeViewSet(viewsets.ModelViewSet):
             response_serializer.data, status=status.HTTP_201_CREATED, headers=headers
         )
 
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop("partial", False)
+        instance = self.get_object()
+
+        if instance.author != request.user:
+            return Response(
+                {"detail": "You do not have permission to perform this action."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        updated_instance = self.get_object()
+        response_serializer = RecipeListSerializer(
+            updated_instance, context={"request": request}
+        )
+
+        if getattr(instance, "_prefetched_objects_cache", None):
+            instance._prefetched_objects_cache = {}
+
+        return Response(response_serializer.data)
+
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
 
-        # Get paginated results
         page = self.paginate_queryset(queryset)
         if page is not None:
-            # Serialize the paginated page
             serializer = self.get_serializer(page, many=True)
-            # Return paginated response with proper format
             return self.get_paginated_response(serializer.data)
-
-        # If no pagination
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
@@ -95,7 +118,6 @@ class RecipeViewSet(viewsets.ModelViewSet):
         detail=False, methods=["get"], permission_classes=[permissions.IsAuthenticated]
     )
     def download_shopping_cart(self, request):
-        # TODO: Implement shopping cart download
         pass
 
     @action(detail=True, methods=["get"], url_path="get-link")
