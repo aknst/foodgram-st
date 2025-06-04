@@ -1,13 +1,23 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from ingredients.models import Ingredient
-from .models import Recipe, RecipeIngredient, ShoppingCart
+from .models import Recipe, RecipeIngredient, ShoppingCart, Favorite
 import uuid
 import base64
 from django.core.files.base import ContentFile
 from users.serializers import UserSerializer as UserSerializer
 
 User = get_user_model()
+
+class FavoriteRecipeSerializer(serializers.ModelSerializer):
+    name = serializers.CharField(source="recipe.name")
+    image = serializers.ImageField(source="recipe.image", use_url=True)
+    cooking_time = serializers.IntegerField(source="recipe.cooking_time")
+
+    class Meta:
+        model = Favorite
+        fields = ("id", "name", "image", "cooking_time")
+        read_only_fields = ("id", "name", "image", "cooking_time")
 
 
 class RecipeLinkSerializer(serializers.Serializer):

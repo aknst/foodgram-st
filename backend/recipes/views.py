@@ -5,12 +5,13 @@ from rest_framework.filters import SearchFilter
 from django_filters.rest_framework import DjangoFilterBackend
 from django.http import HttpResponse
 from django.db import models
-from .models import Recipe, ShoppingCart, RecipeIngredient
+from .models import Recipe, ShoppingCart, RecipeIngredient, Favorite
 from .serializers import (
     RecipeCreateSerializer,
     RecipeListSerializer,
     RecipeLinkSerializer,
     ShoppingCartRecipeSerializer,
+    FavoriteRecipeSerializer,
 )
 from .filters import RecipeFilter
 from .pagination import CustomPagination
@@ -131,12 +132,34 @@ class RecipeViewSet(viewsets.ModelViewSet):
         permission_classes=[permissions.IsAuthenticated],
     )
     def favorite(self, request, pk=None):
-        recipe = self.get_object()
-        if request.method == "POST":
-            recipe.favorites.create(user=request.user)
+        if not request.user.is_authenticated:
+            return Response(
+                {"detail": "Authentication credentials were not provided."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
 
-        recipe.favorites.create(user=request.user)
-        serializer = RecipeListSerializer(recipe, context={"request": request})
+        recipe = self.get_object()
+        
+        if request.method == "DELETE":
+            favorite = Favorite.objects.filter(user=request.user, recipe=recipe)
+            if not favorite.exists():
+                return Response(
+                    {"errors": ["Recipe is not in favorites"]},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            favorite.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+
+        if Favorite.objects.filter(user=request.user, recipe=recipe).exists():
+            return Response(
+                {"errors": ["Recipe is already in favorites"]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        favorite = Favorite.objects.create(user=request.user, recipe=recipe)
+        serializer = FavoriteRecipeSerializer(
+            favorite, context={"request": request}
+        )
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     @action(
