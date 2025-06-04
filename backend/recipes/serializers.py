@@ -42,13 +42,11 @@ class FavoriteRecipeSerializer(serializers.ModelSerializer):
 class RecipeLinkSerializer(serializers.Serializer):
     short_link = serializers.SerializerMethodField()
 
-    def encode_id(self, id):
-        hex_str = f"{id:x}"
-        return hex_str.zfill(2)
-
     def get_short_link(self, obj):
-        short_code = self.encode_id(obj.id)
-        return f"/s/{short_code}"
+        request = self.context.get('request')
+        if request:
+            return request.build_absolute_uri(f"/s/{obj.id}")
+        return f"/s/{obj.id}"
 
     def to_representation(self, instance):
         return {"short-link": self.get_short_link(instance)}
