@@ -4,28 +4,28 @@ from ingredients.models import Ingredient
 
 
 class Recipe(models.Model):
-    name = models.CharField("Название рецепта", max_length=200)
+    name = models.CharField("Name", max_length=200)
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="recipes",
-        verbose_name="Автор",
+        verbose_name="Author",
     )
-    text = models.TextField("Описание")
-    image = models.ImageField("Картинка", upload_to="recipes/images/")
-    cooking_time = models.PositiveSmallIntegerField("Время приготовления (в минутах)")
+    text = models.TextField("Description")
+    image = models.ImageField("Image", upload_to="recipes/images/")
+    cooking_time = models.PositiveSmallIntegerField("Cooking time (minutes)")
     ingredients = models.ManyToManyField(
         Ingredient,
         through="RecipeIngredient",
         related_name="recipes",
-        verbose_name="Ингредиенты",
+        verbose_name="Ingredients",
     )
-    pub_date = models.DateTimeField("Дата публикации", auto_now_add=True)
+    pub_date = models.DateTimeField("Publication date", auto_now_add=True)
 
     class Meta:
         ordering = ("-pub_date",)
-        verbose_name = "Рецепт"
-        verbose_name_plural = "Рецепты"
+        verbose_name = "Recipe"
+        verbose_name_plural = "Recipes"
 
     def __str__(self):
         return self.name
@@ -36,19 +36,19 @@ class RecipeIngredient(models.Model):
         Recipe,
         on_delete=models.CASCADE,
         related_name="recipe_ingredients",
-        verbose_name="Рецепт",
+        verbose_name="Recipe",
     )
     ingredient = models.ForeignKey(
         Ingredient,
         on_delete=models.CASCADE,
         related_name="recipe_ingredients",
-        verbose_name="Ингредиент",
+        verbose_name="Ingredient",
     )
-    amount = models.PositiveSmallIntegerField("Количество")
+    amount = models.PositiveSmallIntegerField("Amount")
 
     class Meta:
-        verbose_name = "Ингредиент в рецепте"
-        verbose_name_plural = "Ингредиенты в рецепте"
+        verbose_name = "Recipe Ingredient"
+        verbose_name_plural = "Recipe Ingredients"
         constraints = [
             models.UniqueConstraint(
                 fields=["recipe", "ingredient"], name="unique_recipe_ingredient"
@@ -64,19 +64,19 @@ class Favorite(models.Model):
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="favorites",
-        verbose_name="Пользователь",
+        verbose_name="User",
     )
     recipe = models.ForeignKey(
         Recipe,
         on_delete=models.CASCADE,
         related_name="favorites",
-        verbose_name="Рецепт",
+        verbose_name="Recipe",
     )
-    added_at = models.DateTimeField("Дата добавления", auto_now_add=True)
+    added_at = models.DateTimeField("Added date", auto_now_add=True)
 
     class Meta:
-        verbose_name = "Избранный рецепт"
-        verbose_name_plural = "Избранные рецепты"
+        verbose_name = "Favorite Recipe"
+        verbose_name_plural = "Favorite Recipes"
         constraints = [
             models.UniqueConstraint(
                 fields=["user", "recipe"], name="unique_favorite_recipe"
@@ -92,19 +92,19 @@ class ShoppingCart(models.Model):
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="shopping_cart",
-        verbose_name="Пользователь",
+        verbose_name="User",
     )
     recipe = models.ForeignKey(
         Recipe,
         on_delete=models.CASCADE,
         related_name="shopping_cart",
-        verbose_name="Рецепт",
+        verbose_name="Recipe",
     )
-    added_at = models.DateTimeField("Дата добавления", auto_now_add=True)
+    added_at = models.DateTimeField("Added date", auto_now_add=True)
 
     class Meta:
-        verbose_name = "Рецепт в корзине"
-        verbose_name_plural = "Рецепты в корзине"
+        verbose_name = "Shopping Cart Item"
+        verbose_name_plural = "Shopping Cart Items"
         constraints = [
             models.UniqueConstraint(
                 fields=["user", "recipe"], name="unique_recipe_in_cart"
