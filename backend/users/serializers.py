@@ -60,7 +60,7 @@ class UserSerializer(serializers.ModelSerializer):
         validators=[
             UniqueValidator(
                 queryset=User.objects.all(),
-                message=_("This email address is already registered."),
+                message="This email address is already registered.",
             )
         ],
     )
@@ -70,11 +70,11 @@ class UserSerializer(serializers.ModelSerializer):
         validators=[
             UniqueValidator(
                 queryset=User.objects.all(),
-                message=_("This username is already taken."),
+                message="This username is already taken.",
             ),
             RegexValidator(
                 regex=r"^[\w.@+-]+$",
-                message=_(
+                message=(
                     "Username must contain only letters, digits, and @/./+/-/_ characters"
                 ),
             ),
@@ -102,10 +102,14 @@ class UserSerializer(serializers.ModelSerializer):
         extra_kwargs = {"password": {"write_only": True}}
 
     def to_representation(self, instance):
-        """Add is_subscribed field for user list view"""
-        representation = super().to_representation(instance)
-        representation["is_subscribed"] = False
-        return representation
+        """Return only required fields for user creation"""
+        return {
+            "id": instance.id,
+            "username": instance.username,
+            "email": instance.email,
+            "first_name": instance.first_name,
+            "last_name": instance.last_name,
+        }
 
     def validate_username(self, value):
         """Validate username format"""
