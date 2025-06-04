@@ -48,6 +48,15 @@ class RecipeIngredient(models.Model):
 
     class Meta:
         verbose_name = "Ингредиент в рецепте"
+        verbose_name_plural = "Ингредиенты в рецепте"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["recipe", "ingredient"], name="unique_recipe_ingredient"
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.ingredient.name} в {self.recipe.name}"
 
 
 class Favorite(models.Model):
@@ -66,11 +75,16 @@ class Favorite(models.Model):
     added_at = models.DateTimeField("Дата добавления", auto_now_add=True)
 
     class Meta:
-        verbose_name = "Избранное"
-        verbose_name_plural = "Избранное"
+        verbose_name = "Избранный рецепт"
+        verbose_name_plural = "Избранные рецепты"
         constraints = [
-            models.UniqueConstraint(fields=["user", "recipe"], name="unique_favorite")
+            models.UniqueConstraint(
+                fields=["user", "recipe"], name="unique_favorite_recipe"
+            )
         ]
+
+    def __str__(self):
+        return f"{self.user.username} - {self.recipe.name}"
 
 
 class ShoppingCart(models.Model):
@@ -89,19 +103,13 @@ class ShoppingCart(models.Model):
     added_at = models.DateTimeField("Дата добавления", auto_now_add=True)
 
     class Meta:
-        verbose_name = "Список покупок"
-        verbose_name_plural = "Списки покупок"
+        verbose_name = "Рецепт в корзине"
+        verbose_name_plural = "Рецепты в корзине"
         constraints = [
             models.UniqueConstraint(
-                fields=["user", "recipe"], name="unique_shopping_cart"
-            )
-        ]
-        verbose_name_plural = "Ингредиенты в рецепте"
-        constraints = [
-            models.UniqueConstraint(
-                fields=["recipe", "ingredient"], name="unique_recipe_ingredient"
+                fields=["user", "recipe"], name="unique_recipe_in_cart"
             )
         ]
 
     def __str__(self):
-        return f"{self.ingredient.name} в {self.recipe.name}"
+        return f"{self.user.username} - {self.recipe.name}"

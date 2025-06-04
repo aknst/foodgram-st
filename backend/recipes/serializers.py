@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from ingredients.models import Ingredient
-from .models import Recipe, RecipeIngredient
+from .models import Recipe, RecipeIngredient, ShoppingCart
 import uuid
 import base64
 from django.core.files.base import ContentFile
@@ -147,6 +147,17 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
         return serializer
 
 
+class ShoppingCartRecipeSerializer(serializers.ModelSerializer):
+    name = serializers.CharField(source="recipe.name")
+    image = serializers.ImageField(source="recipe.image", use_url=True)
+    cooking_time = serializers.IntegerField(source="recipe.cooking_time")
+
+    class Meta:
+        model = ShoppingCart
+        fields = ("id", "name", "image", "cooking_time")
+        read_only_fields = ("id", "name", "image", "cooking_time")
+
+
 class RecipeListSerializer(serializers.ModelSerializer):
     author = UserSerializer(read_only=True)
     ingredients = IngredientInRecipeSerializer(many=True, source="recipe_ingredients")
@@ -166,6 +177,13 @@ class RecipeListSerializer(serializers.ModelSerializer):
             "image",
             "text",
             "cooking_time",
+        )
+        read_only_fields = (
+            "id",
+            "author",
+            "ingredients",
+            "is_favorited",
+            "is_in_shopping_cart",
         )
 
     def get_is_favorited(self, obj):
