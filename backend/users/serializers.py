@@ -10,6 +10,47 @@ import re
 User = get_user_model()
 
 
+class SubscriptionSerializer(serializers.ModelSerializer):
+    """Serializer for subscription response"""
+
+    recipes = serializers.SerializerMethodField()
+    recipes_count = serializers.SerializerMethodField()
+    is_subscribed = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = (
+            "id",
+            "username",
+            "first_name",
+            "last_name",
+            "email",
+            "is_subscribed",
+            "recipes",
+            "recipes_count",
+            "avatar",
+        )
+
+    def get_is_subscribed(self, obj):
+        """Check if current user is subscribed to this user"""
+        user = self.context["request"].user
+        return obj.subscribers.filter(subscriber=user).exists()
+
+    def get_recipes_count(self, obj):
+        """Get total number of recipes for this user"""
+        return obj.recipes.count()
+
+    def get_recipes(self, obj):
+        """Get recipes with optional limit"""
+        recipes_limit = self.context.get("recipes_limit")
+        recipes = obj.get_latest_recipes(limit=recipes_limit)
+        from recipes.serializers import RecipeSerializer
+
+        return RecipeSerializer(
+            recipes, many=True, fields=("id", "name", "image", "cooking_time")
+        ).data
+
+
 class UserSerializer(serializers.ModelSerializer):
     """Serializer for user registration and profile management"""
 

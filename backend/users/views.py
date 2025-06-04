@@ -5,7 +5,49 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from django.contrib.auth import get_user_model
 from rest_framework.authtoken.models import Token
 from rest_framework.pagination import PageNumberPagination
-from .serializers import UserSerializer, TokenSerializer, PasswordResetSerializer
+from .models import Subscription
+from .serializers import UserSerializer, TokenSerializer, PasswordResetSerializer, SubscriptionSerializer
+
+User = get_user_model()
+
+class SubscriptionsListView(APIView):
+    """View for listing all user subscriptions"""
+    permission_classes = [IsAuthenticated]
+    pagination_class = PageNumberPagination
+
+    def get(self, request, *args, **kwargs):
+        """List all subscriptions of the current user"""
+        self.pagination_class.page_size = 6
+        self.pagination_class.page_size_query_param = "limit"
+        self.pagination_class.max_page_size = 100
+
+        # Get all users the current user is subscribed to
+        subscriptions = User.objects.filter(
+            subscribers__subscriber=request.user
+        ).order_by('username')
+
+        # Apply pagination
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(subscriptions, request)
+
+        # Get recipes_limit from query params
+        recipes_limit = request.query_params.get('recipes_limit')
+        if recipes_limit:
+            try:
+                recipes_limit = int(recipes_limit)
+                if recipes_limit < 0:
+                    recipes_limit = None
+            except (ValueError, TypeError):
+                recipes_limit = None
+
+        # Serialize with context for recipes_limit
+        serializer = SubscriptionSerializer(
+            page,
+            many=True,
+            context={'request': request, 'recipes_limit': recipes_limit}
+        )
+
+        return paginator.get_paginated_response(serializer.data)
 
 User = get_user_model()
 
@@ -94,6 +136,73 @@ class CurrentUserView(APIView):
         serializer = UserSerializer(request.user, context={"request": request})
         return Response(serializer.data)
 
+
+class SubscriptionView(APIView):
+    """View for managing user subscriptions"""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, user_id, *args, **kwargs):
+        """Subscribe to a user"""
+        try:
+            author = User.objects.get(id=user_id)
+            if request.user == author:
+                return Response(
+                    {"detail": "Cannot subscribe to yourself"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            subscription, created = Subscription.objects.get_or_create(
+                subscriber=request.user,
+                author=author
+            )
+
+            if not created:
+                return Response(
+                    {"detail": "Already subscribed"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            serializer = SubscriptionSerializer(
+                author,
+                context={'request': request}
+            )
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+        except User.DoesNotExist:
+            return Response(
+                {"detail": "User not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+    def delete(self, request, user_id, *args, **kwargs):
+        """Unsubscribe from a user"""
+        try:
+            author = User.objects.get(id=user_id)
+            if request.user == author:
+                return Response(
+                    {"detail": "Cannot unsubscribe from yourself"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            subscription = Subscription.objects.filter(
+                subscriber=request.user,
+                author=author
+            ).first()
+
+            if not subscription:
+                return Response(
+                    {"detail": "Not subscribed"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            subscription.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+
+        except User.DoesNotExist:
+            return Response(
+                {"detail": "User not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
 class PasswordResetView(APIView):
     """View for password reset"""

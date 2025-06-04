@@ -9,6 +9,25 @@ from users.serializers import UserSerializer as UserSerializer
 
 User = get_user_model()
 
+
+class RecipeSerializer(serializers.ModelSerializer):
+    """Serializer for recipe data in subscriptions"""
+
+    class Meta:
+        model = Recipe
+        fields = ("id", "name", "image", "cooking_time")
+        read_only_fields = ("id", "name", "image", "cooking_time")
+
+    def __init__(self, *args, **kwargs):
+        fields = kwargs.pop("fields", None)
+        super().__init__(*args, **kwargs)
+        if fields is not None:
+            allowed = set(fields)
+            existing = set(self.fields)
+            for field_name in existing - allowed:
+                self.fields.pop(field_name)
+
+
 class FavoriteRecipeSerializer(serializers.ModelSerializer):
     name = serializers.CharField(source="recipe.name")
     image = serializers.ImageField(source="recipe.image", use_url=True)
