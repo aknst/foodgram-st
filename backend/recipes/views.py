@@ -41,6 +41,24 @@ class RecipeViewSet(viewsets.ModelViewSet):
         serializer_class = self.get_serializer_class()
         return serializer_class(*args, **kwargs)
 
+    def get_queryset(self):
+        queryset = self.queryset
+        
+        # For unauthenticated users, return all recipes
+        if not self.request.user.is_authenticated:
+            return queryset
+            
+        # For authenticated users, apply filters
+        filters = {}
+        if self.request.query_params.get('is_favorited') == '1':
+            filters['favorites__user'] = self.request.user
+        if self.request.query_params.get('is_in_shopping_cart') == '1':
+            filters['shopping_cart__user'] = self.request.user
+        
+        if filters:
+            return queryset.filter(**filters)
+        return queryset
+
     @action(
         detail=False, methods=["get"], permission_classes=[permissions.IsAuthenticated]
     )
@@ -168,6 +186,12 @@ class RecipeViewSet(viewsets.ModelViewSet):
         permission_classes=[permissions.IsAuthenticated]
     )
     def shopping_cart(self, request, pk=None):
+        if not request.user.is_authenticated:
+            return Response(
+                {"detail": "Authentication credentials were not provided."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
         recipe = self.get_object()
         
         if request.method == "DELETE":
