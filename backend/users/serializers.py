@@ -102,13 +102,30 @@ class UserSerializer(serializers.ModelSerializer):
         extra_kwargs = {"password": {"write_only": True}}
 
     def to_representation(self, instance):
-        """Return only required fields for user creation"""
+        """Customize representation based on context"""
+        if self.context.get("action") == "create":
+            return {
+                "id": instance.id,
+                "username": instance.username,
+                "email": instance.email,
+                "first_name": instance.first_name,
+                "last_name": instance.last_name,
+            }
+        request = self.context.get("request")
+        is_subscribed = False
+        if request and request.user.is_authenticated:
+            is_subscribed = instance.subscribers.filter(
+                subscriber=request.user
+            ).exists()
+
         return {
             "id": instance.id,
             "username": instance.username,
-            "email": instance.email,
             "first_name": instance.first_name,
             "last_name": instance.last_name,
+            "email": instance.email,
+            "is_subscribed": is_subscribed,
+            "avatar": instance.avatar.url if instance.avatar else None,
         }
 
     def validate_username(self, value):

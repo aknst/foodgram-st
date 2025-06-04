@@ -66,12 +66,19 @@ class UserView(APIView):
         paginator.max_page_size = 100
         page = paginator.paginate_queryset(queryset, request)
 
-        serializer = UserSerializer(page, many=True, context={"request": request})
+        serializer = UserSerializer(
+            page,
+            many=True,
+            context={"request": request, "action": "list"}
+        )
         return paginator.get_paginated_response(serializer.data)
 
     def post(self, request, *args, **kwargs):
         """Create a new user"""
-        serializer = UserSerializer(data=request.data)
+        serializer = UserSerializer(
+            data=request.data,
+            context={"action": "create"}
+        )
         if serializer.is_valid():
             serializer.save()
             return Response(
@@ -162,9 +169,19 @@ class SubscriptionView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
+            # Get recipes_limit from query params
+            recipes_limit = request.query_params.get('recipes_limit')
+            if recipes_limit:
+                try:
+                    recipes_limit = int(recipes_limit)
+                    if recipes_limit < 0:
+                        recipes_limit = None
+                except (ValueError, TypeError):
+                    recipes_limit = None
+
             serializer = SubscriptionSerializer(
                 author,
-                context={'request': request}
+                context={'request': request, 'recipes_limit': recipes_limit}
             )
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
