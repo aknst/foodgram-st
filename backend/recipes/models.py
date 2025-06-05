@@ -4,28 +4,28 @@ from ingredients.models import Ingredient
 
 
 class Recipe(models.Model):
-    name = models.CharField("Name", max_length=200)
+    name = models.CharField("Название", max_length=200)
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="recipes",
-        verbose_name="Author",
+        verbose_name="Автор",
     )
-    text = models.TextField("Description")
-    image = models.ImageField("Image", upload_to="recipes/images/")
-    cooking_time = models.PositiveSmallIntegerField("Cooking time (minutes)")
+    text = models.TextField("Описание")
+    image = models.ImageField("Изображение", upload_to="recipes/images/")
+    cooking_time = models.PositiveSmallIntegerField("Время приготовления (минуты)")
     ingredients = models.ManyToManyField(
         Ingredient,
         through="RecipeIngredient",
         related_name="recipes",
-        verbose_name="Ingredients",
+        verbose_name="Ингредиенты",
     )
-    pub_date = models.DateTimeField("Publication date", auto_now_add=True)
+    pub_date = models.DateTimeField("Дата публикации", auto_now_add=True)
 
     class Meta:
         ordering = ("-pub_date",)
-        verbose_name = "Recipe"
-        verbose_name_plural = "Recipes"
+        verbose_name = "Рецепт"
+        verbose_name_plural = "Рецепты"
 
     def __str__(self):
         return self.name
@@ -36,19 +36,19 @@ class RecipeIngredient(models.Model):
         Recipe,
         on_delete=models.CASCADE,
         related_name="recipe_ingredients",
-        verbose_name="Recipe",
+        verbose_name="Рецепт",
     )
     ingredient = models.ForeignKey(
         Ingredient,
         on_delete=models.CASCADE,
         related_name="recipe_ingredients",
-        verbose_name="Ingredient",
+        verbose_name="Ингредиент",
     )
-    amount = models.PositiveSmallIntegerField("Amount")
+    amount = models.PositiveSmallIntegerField("Количество")
 
     class Meta:
-        verbose_name = "Recipe Ingredient"
-        verbose_name_plural = "Recipe Ingredients"
+        verbose_name = "Ингредиент рецепта"
+        verbose_name_plural = "Ингредиенты рецепта"
         constraints = [
             models.UniqueConstraint(
                 fields=["recipe", "ingredient"], name="unique_recipe_ingredient"
@@ -64,19 +64,19 @@ class Favorite(models.Model):
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="favorites",
-        verbose_name="User",
+        verbose_name="Пользователь",
     )
     recipe = models.ForeignKey(
         Recipe,
         on_delete=models.CASCADE,
         related_name="favorites",
-        verbose_name="Recipe",
+        verbose_name="Рецепт",
     )
-    added_at = models.DateTimeField("Added date", auto_now_add=True)
+    added_at = models.DateTimeField("Дата добавления", auto_now_add=True)
 
     class Meta:
-        verbose_name = "Favorite Recipe"
-        verbose_name_plural = "Favorite Recipes"
+        verbose_name = "Избранный рецепт"
+        verbose_name_plural = "Избранные рецепты"
         constraints = [
             models.UniqueConstraint(
                 fields=["user", "recipe"], name="unique_favorite_recipe"
@@ -92,19 +92,19 @@ class ShoppingCart(models.Model):
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="shopping_cart",
-        verbose_name="User",
+        verbose_name="Пользователь",
     )
     recipe = models.ForeignKey(
         Recipe,
         on_delete=models.CASCADE,
         related_name="shopping_cart",
-        verbose_name="Recipe",
+        verbose_name="Рецепт",
     )
-    added_at = models.DateTimeField("Added date", auto_now_add=True)
+    added_at = models.DateTimeField("Дата добавления", auto_now_add=True)
 
     class Meta:
-        verbose_name = "Shopping Cart Item"
-        verbose_name_plural = "Shopping Cart Items"
+        verbose_name = "Элемент списка покупок"
+        verbose_name_plural = "Список покупок"
         constraints = [
             models.UniqueConstraint(
                 fields=["user", "recipe"], name="unique_recipe_in_cart"

@@ -10,19 +10,19 @@ class Subscription(models.Model):
         "User",
         related_name="subscriptions",
         on_delete=models.CASCADE,
-        verbose_name=_("subscriber"),
+        verbose_name="Подписчик",
     )
     author = models.ForeignKey(
         "User",
         related_name="subscribers",
         on_delete=models.CASCADE,
-        verbose_name=_("author"),
+        verbose_name="Автор",
     )
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name=_("created at"))
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата создания")
 
     class Meta:
-        verbose_name = _("subscription")
-        verbose_name_plural = _("subscriptions")
+        verbose_name = "Подписка"
+        verbose_name_plural = "Подписки"
         unique_together = ("subscriber", "author")
         constraints = [
             models.CheckConstraint(
@@ -36,44 +36,40 @@ class Subscription(models.Model):
 
 
 class User(AbstractUser):
-    """Custom user model with email as username field"""
+    """Пользовательская модель с email как полем имени пользователя"""
 
     email = models.EmailField(
-        _("email address"),
+        "Адрес эл. почты",
         unique=True,
         max_length=254,
-        help_text=_(
-            "Required. 254 characters or fewer. Must be a valid email address."
-        ),
+        help_text="Обязательно. Не более 254 символов. Должен быть действительным адресом эл. почты.",
     )
     username = models.CharField(
-        _("username"),
+        "Имя пользователя",
         max_length=150,
-        help_text=_(
-            "Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only."
-        ),
+        help_text="Обязательно. Не более 150 символов. Буквы, цифры и символы @/./+/-/_ только.",
     )
-    first_name = models.CharField(_("first name"), max_length=150)
-    last_name = models.CharField(_("last name"), max_length=150)
-    avatar = models.ImageField(_("avatar"), upload_to="avatars/", null=True, blank=True)
+    first_name = models.CharField("Имя", max_length=150)
+    last_name = models.CharField("Фамилия", max_length=150)
+    avatar = models.ImageField("Аватар", upload_to="avatars/", null=True, blank=True)
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = ["username", "first_name", "last_name"]
 
     class Meta:
-        verbose_name = _("user")
-        verbose_name_plural = _("users")
+        verbose_name = "Пользователь"
+        verbose_name_plural = "Пользователи"
         ordering = ("username",)
 
     def __str__(self):
         return self.username
 
     def get_full_name(self):
-        """Return the first_name plus the last_name, with a space in between."""
+        """Возвращает имя и фамилию, разделенные пробелом."""
         return f"{self.first_name} {self.last_name}"
 
     def get_latest_recipes(self, limit=3):
-        """Get latest recipes of the user with limited fields"""
+        """Получает последние рецепты пользователя с ограниченным набором полей"""
         from recipes.models import Recipe
 
         return Recipe.objects.filter(author=self)[: limit if limit else 3]

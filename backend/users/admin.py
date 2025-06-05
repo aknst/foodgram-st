@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.translation import gettext_lazy as _
-from .models import User
+from .models import User, Subscription
 
 class UserAdmin(BaseUserAdmin):
     fieldsets = (
@@ -17,5 +17,12 @@ class UserAdmin(BaseUserAdmin):
     )
     list_display = ('username', 'email', 'first_name', 'last_name', 'is_staff')
     search_fields = ('username', 'email', 'first_name', 'last_name')
+
+@admin.register(Subscription)
+class SubscriptionAdmin(admin.ModelAdmin):
+    list_display = ('subscriber', 'author', 'created_at')
+    list_filter = ('subscriber', 'author')
+    search_fields = ('subscriber__username', 'author__username')
+    empty_value_display = '-пусто-'
 
 admin.site.register(User, UserAdmin)
