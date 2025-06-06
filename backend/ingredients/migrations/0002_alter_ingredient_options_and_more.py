@@ -4,24 +4,31 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('ingredients', '0001_initial'),
+        ("ingredients", "0001_initial"),
     ]
 
     operations = [
         migrations.AlterModelOptions(
-            name='ingredient',
-            options={'ordering': ('name',), 'verbose_name': 'Ingredient', 'verbose_name_plural': 'Ingredients'},
+            name="ingredient",
+            options={
+                "ordering": ("name",),
+                "verbose_name": "Ingredient",
+                "verbose_name_plural": "Ingredients",
+            },
         ),
         migrations.AlterField(
-            model_name='ingredient',
-            name='measurement_unit',
-            field=models.CharField(max_length=200, verbose_name='Measurement unit'),
+            model_name="ingredient",
+            name="measurement_unit",
+            field=models.CharField(
+                max_length=200, verbose_name="Measurement unit"
+            ),
         ),
         migrations.AlterField(
-            model_name='ingredient',
-            name='name',
-            field=models.CharField(max_length=200, verbose_name='Ingredient name'),
+            model_name="ingredient",
+            name="name",
+            field=models.CharField(
+                max_length=200, verbose_name="Ingredient name"
+            ),
         ),
     ]

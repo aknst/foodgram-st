@@ -1,10 +1,11 @@
-from django.core.management.base import BaseCommand
-from django.contrib.auth import get_user_model
-from recipes.models import Recipe, RecipeIngredient
-from ingredients.models import Ingredient
-from django.conf import settings
 import json
 from pathlib import Path
+
+from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.core.management.base import BaseCommand
+from ingredients.models import Ingredient
+from recipes.models import Recipe, RecipeIngredient
 
 User = get_user_model()
 
@@ -22,9 +23,13 @@ class Command(BaseCommand):
                 for ingredient in ingredients:
                     Ingredient.objects.get_or_create(
                         name=ingredient["name"],
-                        defaults={"measurement_unit": ingredient["measurement_unit"]},
+                        defaults={
+                            "measurement_unit": ingredient["measurement_unit"]
+                        },
                     )
-                self.stdout.write(self.style.SUCCESS("Successfully loaded ingredients"))
+                self.stdout.write(
+                    self.style.SUCCESS("Successfully loaded ingredients")
+                )
 
         users_file = data_dir / "users.json"
         if users_file.exists():
@@ -35,7 +40,7 @@ class Command(BaseCommand):
                         user = User.objects.get(username=user_data["username"])
                         self.stdout.write(
                             self.style.WARNING(
-                                f"User {user_data['username']} already exists, skipping..."
+                                f"User {user_data['username']} already exists"
                             )
                         )
                         continue
@@ -50,7 +55,9 @@ class Command(BaseCommand):
                         self.stdout.write(
                             self.style.SUCCESS(f"Created user {user.username}")
                         )
-                self.stdout.write(self.style.SUCCESS("Successfully loaded users"))
+                self.stdout.write(
+                    self.style.SUCCESS("Successfully loaded users")
+                )
 
         recipes_file = data_dir / "recipes.json"
         if recipes_file.exists():
@@ -72,14 +79,16 @@ class Command(BaseCommand):
                     if not created:
                         self.stdout.write(
                             self.style.WARNING(
-                                f"Recipe {recipe_data['name']} already exists, skipping..."
+                                f"Recipe {recipe_data['name']} already exists"
                             )
                         )
                         continue
 
                     for ingredient_data in recipe_data["ingredients"]:
                         try:
-                            ingredient = ingredients.get(name=ingredient_data["name"])
+                            ingredient = ingredients.get(
+                                name=ingredient_data["name"]
+                            )
                             RecipeIngredient.objects.get_or_create(
                                 recipe=recipe,
                                 ingredient=ingredient,
@@ -88,14 +97,20 @@ class Command(BaseCommand):
                         except Ingredient.DoesNotExist:
                             self.stdout.write(
                                 self.style.WARNING(
-                                    f"Warning: Ingredient '{ingredient_data['name']}' not found for recipe '{recipe.name}'"
+                                    (
+                                        f"Warning: '{ingredient_data['name']}'"
+                                        f"not found for recipe '{recipe.name}'"
+                                    )
                                 )
                             )
                             continue
 
                     self.stdout.write(
                         self.style.SUCCESS(
-                            f"Created recipe {recipe.name} by {author.username}"
+                            (
+                                f"Created recipe {recipe.name}"
+                                f"by {author.username}"
+                            )
                         )
                     )
 

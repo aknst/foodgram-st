@@ -1,50 +1,63 @@
-from rest_framework import serializers
-from django.contrib.auth import get_user_model, authenticate
+import re
+
+from django.contrib.auth import authenticate, get_user_model
 from django.core.validators import RegexValidator
 from django.utils.translation import gettext_lazy as _
+from recipes.serializers import RecipeSerializer
+from rest_framework import serializers
 from rest_framework.authtoken.models import Token
 from rest_framework.validators import UniqueValidator
+
 from .fields import Base64ImageField
-import re
+from .models import Subscription
 
 User = get_user_model()
 
 
 class SubscriptionSerializer(serializers.ModelSerializer):
-    """Serializer for subscription response"""
-
     recipes = serializers.SerializerMethodField()
     recipes_count = serializers.SerializerMethodField()
     is_subscribed = serializers.SerializerMethodField()
 
     class Meta:
-        model = User
+        model = Subscription
         fields = (
             "id",
-            "username",
-            "first_name",
-            "last_name",
-            "email",
-            "is_subscribed",
             "recipes",
             "recipes_count",
-            "avatar",
+            "is_subscribed",
         )
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        author_data = UserSerializer(
+            instance.author, context=self.context
+        ).data
+        data.update(
+            {
+                "username": author_data["username"],
+                "first_name": author_data["first_name"],
+                "last_name": author_data["last_name"],
+                "email": author_data["email"],
+                "avatar": author_data.get("avatar", None),
+            }
+        )
+        return data
+
     def get_is_subscribed(self, obj):
-        """Check if current user is subscribed to this user"""
         user = self.context["request"].user
-        return obj.subscribers.filter(subscriber=user).exists()
+        return user.subscriptions.filter(author=obj.author).exists()
 
     def get_recipes_count(self, obj):
-        """Get total number of recipes for this user"""
-        return obj.recipes.count()
+        return obj.author.recipes.count()
 
     def get_recipes(self, obj):
-        """Get recipes with optional limit"""
         recipes_limit = self.context.get("recipes_limit")
-        recipes = obj.get_latest_recipes(limit=recipes_limit)
-        from recipes.serializers import RecipeSerializer
+        recipes = (
+            obj.author.recipes.all()[:recipes_limit]
+            if recipes_limit
+            else obj.author.recipes.all()
+        )
 
         return RecipeSerializer(
             recipes, many=True, fields=("id", "name", "image", "cooking_time")
@@ -52,8 +65,6 @@ class SubscriptionSerializer(serializers.ModelSerializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
-    """Serializer for user registration and profile management"""
-
     email = serializers.EmailField(
         required=True,
         max_length=254,
@@ -75,7 +86,7 @@ class UserSerializer(serializers.ModelSerializer):
             RegexValidator(
                 regex=r"^[\w.@+-]+$",
                 message=(
-                    "Username must contain only letters, digits, and @/./+/-/_ characters"
+                    "Username must contain letters, digits, and @/./+/-/_"
                 ),
             ),
         ],
@@ -102,7 +113,6 @@ class UserSerializer(serializers.ModelSerializer):
         extra_kwargs = {"password": {"write_only": True}}
 
     def to_representation(self, instance):
-        """Customize representation based on context"""
         if self.context.get("action") == "create":
             return {
                 "id": instance.id,
@@ -129,17 +139,13 @@ class UserSerializer(serializers.ModelSerializer):
         }
 
     def validate_username(self, value):
-        """Validate username format"""
         if not re.match(r"^[\w.@+-]+$", value):
             raise serializers.ValidationError(
-                _(
-                    "Username must contain only letters, digits, and @/./+/-/_ characters"
-                )
+                _("Username must contain only letters, digits, and @/./+/-/_")
             )
         return value
 
     def create(self, validated_data):
-        """Create and return a new user"""
         password = validated_data.pop("password")
         user = User(**validated_data)
         user.set_password(password)
@@ -148,19 +154,20 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class TokenSerializer(serializers.Serializer):
-    """Serializer for token authentication"""
-
     auth_token = serializers.CharField(read_only=True)
     email = serializers.EmailField(write_only=True)
-    password = serializers.CharField(write_only=True, style={"input_type": "password"})
+    password = serializers.CharField(
+        write_only=True, style={"input_type": "password"}
+    )
 
     def validate(self, data):
-        """Validate user credentials and return token"""
         email = data.get("email")
         password = data.get("password")
 
         if not email or not password:
-            raise serializers.ValidationError(_("Email and password are required."))
+            raise serializers.ValidationError(
+                _("Email and password are required.")
+            )
 
         user = authenticate(email=email, password=password)
         if not user:
@@ -173,8 +180,6 @@ class TokenSerializer(serializers.Serializer):
 
 
 class PasswordResetSerializer(serializers.Serializer):
-    """Serializer for password reset"""
-
     current_password = serializers.CharField(
         write_only=True, style={"input_type": "password"}, required=True
     )
@@ -183,7 +188,6 @@ class PasswordResetSerializer(serializers.Serializer):
     )
 
     def validate(self, data):
-        """Validate current password and ensure new password is not empty"""
         current_password = data.get("current_password")
         new_password = data.get("new_password")
 

@@ -1,5 +1,5 @@
-from django.db import models
 from django.conf import settings
+from django.db import models
 from ingredients.models import Ingredient
 
 
@@ -13,7 +13,9 @@ class Recipe(models.Model):
     )
     text = models.TextField("Описание")
     image = models.ImageField("Изображение", upload_to="recipes/images/")
-    cooking_time = models.PositiveSmallIntegerField("Время приготовления (минуты)")
+    cooking_time = models.PositiveSmallIntegerField(
+        "Время приготовления (минуты)"
+    )
     ingredients = models.ManyToManyField(
         Ingredient,
         through="RecipeIngredient",
@@ -51,7 +53,8 @@ class RecipeIngredient(models.Model):
         verbose_name_plural = "Ингредиенты рецепта"
         constraints = [
             models.UniqueConstraint(
-                fields=["recipe", "ingredient"], name="unique_recipe_ingredient"
+                fields=["recipe", "ingredient"],
+                name="unique_recipe_ingredient",
             )
         ]
 

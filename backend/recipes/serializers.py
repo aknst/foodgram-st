@@ -1,11 +1,12 @@
-from rest_framework import serializers
-from django.contrib.auth import get_user_model
-from ingredients.models import Ingredient
-from .models import Recipe, RecipeIngredient, ShoppingCart, Favorite
-import uuid
 import base64
+import uuid
+
+from django.contrib.auth import get_user_model
 from django.core.files.base import ContentFile
-from users.serializers import UserSerializer as UserSerializer
+from ingredients.models import Ingredient
+from rest_framework import serializers
+
+from .models import Favorite, Recipe, RecipeIngredient, ShoppingCart
 
 User = get_user_model()
 
@@ -43,7 +44,7 @@ class RecipeLinkSerializer(serializers.Serializer):
     short_link = serializers.SerializerMethodField()
 
     def get_short_link(self, obj):
-        request = self.context.get('request')
+        request = self.context.get("request")
         if request:
             return request.build_absolute_uri(f"/s/{obj.id}")
         return f"/s/{obj.id}"
@@ -72,8 +73,12 @@ class IngredientInRecipeSerializer(serializers.ModelSerializer):
         read_only_fields = ("id",)
 
     def validate_id(self, value):
-        if not Ingredient.objects.filter(id=value).exists():
-            raise serializers.ValidationError(f"Ingredient with id {value} not found")
+        try:
+            Ingredient.objects.get(id=value)
+        except Ingredient.DoesNotExist:
+            raise serializers.ValidationError(
+                f"Ingredient with id {value} not found"
+            )
         return value
 
     def validate_amount(self, value):
@@ -104,21 +109,25 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
 
     def validate_cooking_time(self, value):
         if value <= 0:
-            raise serializers.ValidationError("Cooking time must be greater than 0")
+            raise serializers.ValidationError(
+                "Cooking time must be greater than 0"
+            )
         return value
 
     def validate_ingredients(self, value):
         if not value:
-            raise serializers.ValidationError("Ingredients list cannot be empty")
+            raise serializers.ValidationError(
+                "Ingredients list cannot be empty"
+            )
 
         ingredients = []
         for item in value:
-            ingredient = Ingredient.objects.filter(id=item["id"]).first()
+            ingredient = Ingredient.objects.get(id=item["id"])
             if not ingredient:
                 raise serializers.ValidationError(
                     f"Ingredient with id {item['id']} not found"
                 )
-            if ingredient in ingredients:
+            if ingredient.id in [i.id for i in ingredients]:
                 raise serializers.ValidationError(
                     "Duplicate ingredients are not allowed"
                 )
@@ -144,10 +153,9 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
             instance.image = image
         ingredients = validated_data.get("ingredients")
         if ingredients:
-            RecipeIngredient.objects.filter(recipe=instance).delete()
+            instance.recipe_ingredients.all().delete()
             for ingredient_data in ingredients:
-                RecipeIngredient.objects.create(
-                    recipe=instance,
+                instance.recipe_ingredients.create(
                     ingredient_id=ingredient_data["id"],
                     amount=ingredient_data["amount"],
                 )
@@ -162,8 +170,7 @@ class RecipeCreateSerializer(serializers.ModelSerializer):
             author=self.context["request"].user, **validated_data
         )
         for ingredient_data in ingredients:
-            RecipeIngredient.objects.create(
-                recipe=recipe,
+            recipe.recipe_ingredients.create(
                 ingredient_id=ingredient_data["id"],
                 amount=ingredient_data["amount"],
             )
@@ -186,11 +193,18 @@ class ShoppingCartRecipeSerializer(serializers.ModelSerializer):
 
 
 class RecipeListSerializer(serializers.ModelSerializer):
-    author = UserSerializer(read_only=True)
-    ingredients = IngredientInRecipeSerializer(many=True, source="recipe_ingredients")
+    author = serializers.SerializerMethodField()
+    ingredients = IngredientInRecipeSerializer(
+        many=True, source="recipe_ingredients"
+    )
     is_favorited = serializers.SerializerMethodField()
     is_in_shopping_cart = serializers.SerializerMethodField()
     image = serializers.ImageField(use_url=True)
+
+    def get_author(self, obj):
+        from users.serializers import UserSerializer
+
+        return UserSerializer(obj.author).data
 
     class Meta:
         model = Recipe
@@ -227,16 +241,7 @@ class RecipeListSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
-        author_data = UserSerializer(instance.author, context=self.context).data
-        data["author"] = {
-            "id": author_data["id"],
-            "username": author_data["username"],
-            "first_name": author_data["first_name"],
-            "last_name": author_data["last_name"],
-            "email": author_data["email"],
-            "is_subscribed": False,
-            "avatar": author_data.get("avatar", None),
-        }
+        data["author"] = self.get_author(instance)
         data["ingredients"] = [
             {
                 "id": ingredient.ingredient_id,
