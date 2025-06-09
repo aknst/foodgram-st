@@ -1,14 +1,12 @@
 import base64
+import uuid
+
 from django.core.files.base import ContentFile
 from rest_framework import serializers
-import uuid
 
 
 class Base64ImageField(serializers.ImageField):
-    """Custom ImageField that accepts base64 encoded images"""
-
     def to_internal_value(self, data):
-        """Convert base64 string to image file"""
         if isinstance(data, str) and data.startswith("data:image"):
             format, imgstr = data.split(";base64,")
             ext = format.split("/")[-1]
@@ -24,7 +22,6 @@ class Base64ImageField(serializers.ImageField):
         return super().to_internal_value(data)
 
     def to_representation(self, value):
-        """Return URL of the image file"""
         if not value:
             return None
 
