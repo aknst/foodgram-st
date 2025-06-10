@@ -5,11 +5,22 @@ from .models import Favorite, Recipe, RecipeIngredient, ShoppingCart
 
 @admin.register(Recipe)
 class RecipeAdmin(admin.ModelAdmin):
-    list_display = ("name", "author", "cooking_time", "pub_date")
+    list_display = (
+        "name",
+        "author",
+        "cooking_time",
+        "pub_date",
+        "favorite_count",
+    )
     list_filter = ("author", "name")
-    search_fields = ("name", "author__username", "tags__name")
-    readonly_fields = ("pub_date",)
+    search_fields = ("name", "author__username")
+    readonly_fields = ("pub_date", "favorite_count")
     empty_value_display = "-пусто-"
+
+    def favorite_count(self, obj):
+        return obj.favorites.count()
+
+    favorite_count.short_description = "Количество добавлений в избранное"
 
 
 @admin.register(RecipeIngredient)
