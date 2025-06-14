@@ -15,16 +15,7 @@ class RecipeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Recipe
         fields = ("id", "name", "image", "cooking_time")
-        read_only_fields = ("id", "name", "image", "cooking_time")
-
-    def __init__(self, *args, **kwargs):
-        fields = kwargs.pop("fields", None)
-        super().__init__(*args, **kwargs)
-        if fields is not None:
-            allowed = set(fields)
-            existing = set(self.fields)
-            for field_name in existing - allowed:
-                self.fields.pop(field_name)
+        read_only_fields = fields
 
 
 class FavoriteRecipeSerializer(serializers.ModelSerializer):
