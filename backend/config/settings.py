@@ -22,6 +22,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Load environment variables from infra directory
 load_dotenv(os.path.join(BASE_DIR.parent, "infra", ".env"))
 
+DEBUG = True
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
@@ -30,9 +31,6 @@ SECRET_KEY = os.getenv(
     "SECRET_KEY",
     "secretkey",
 )
-
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv("DEBUG", "True") == "True"
 
 ALLOWED_HOSTS = os.getenv(
     "ALLOWED_HOSTS", "localhost,127.0.0.1,host.docker.internal"
@@ -118,22 +116,30 @@ REST_FRAMEWORK = {
         "rest_framework.authentication.TokenAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": (
-        "rest_framework.permissions.IsAuthenticated",
+        "rest_framework.permissions.IsAuthenticatedOrReadOnly",
     ),
-    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",  # noqa: E501
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.LimitOffsetPagination",  # noqa: E501
     "PAGE_SIZE": 6,
+    "PAGE_SIZE_QUERY_PARAM": "limit",
+    "MAX_PAGE_SIZE": 100,
+    "PAGE_SIZE_PARAM": "limit",
 }
 
 DJOSER = {
+    "USER_ID_FIELD": "id",
     "LOGIN_FIELD": "email",
-    "USER_CREATE_PASSWORD_RETYPE": True,
+    "USER_CREATE_PASSWORD_RETYPE": False,
+    "HIDE_USERS": False,
     "SERIALIZERS": {
-        "user_create": "users.serializers.UserSerializer",
-        "user": "users.serializers.UserSerializer",
+        "user_create": "djoser.serializers.UserCreateSerializer",
+        "user": "users.serializers.UserProfileSerializer",
+        "current_user": "users.serializers.UserProfileSerializer",
     },
     "PERMISSIONS": {
-        "user": ["rest_framework.permissions.AllowAny"],
+        "user": ["rest_framework.permissions.IsAuthenticatedOrReadOnly"],
         "user_list": ["rest_framework.permissions.AllowAny"],
+        "user_create": ["rest_framework.permissions.AllowAny"],
+        "user_delete": ["rest_framework.permissions.IsAuthenticated"],
     },
 }
 

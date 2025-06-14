@@ -12,8 +12,6 @@ User = get_user_model()
 
 
 class RecipeSerializer(serializers.ModelSerializer):
-    """Serializer for recipe data in subscriptions"""
-
     class Meta:
         model = Recipe
         fields = ("id", "name", "image", "cooking_time")
@@ -202,9 +200,9 @@ class RecipeListSerializer(serializers.ModelSerializer):
     image = serializers.ImageField(use_url=True)
 
     def get_author(self, obj):
-        from users.serializers import UserSerializer
+        from users.serializers import UserProfileSerializer
 
-        return UserSerializer(obj.author).data
+        return UserProfileSerializer(obj.author).data
 
     class Meta:
         model = Recipe

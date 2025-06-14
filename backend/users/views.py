@@ -1,270 +1,121 @@
 from django.contrib.auth import get_user_model
+from django.shortcuts import get_object_or_404
+from djoser.views import UserViewSet
 from rest_framework import status
-from rest_framework.pagination import PageNumberPagination
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.decorators import action
+from rest_framework.pagination import LimitOffsetPagination
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.views import APIView
 
 from .models import Subscription
 from .serializers import (
-    PasswordResetSerializer,
-    SubscriptionSerializer,
-    TokenSerializer,
-    UserSerializer,
+    SubscriptionsSerializer,
+    UserAvatarSerializer,
+    UserProfileSerializer,
+    UserWithRecipesSerializer,
 )
 
 User = get_user_model()
 
 
-class SubscriptionsListView(APIView):
-    permission_classes = [IsAuthenticated]
-    pagination_class = PageNumberPagination
+class UserView(UserViewSet):
+    serializer_class = UserProfileSerializer
+    pagination_class = LimitOffsetPagination
 
-    def get(self, request, *args, **kwargs):
-        self.pagination_class.page_size = 6
-        self.pagination_class.page_size_query_param = "limit"
-        self.pagination_class.max_page_size = 100
+    def get_permissions(self):
+        if self.action == "me":
+            return [IsAuthenticated()]
+        return super().get_permissions()
 
-        subscriptions = request.user.subscriptions.all().order_by(
-            "author__username"
-        )
+    @action(
+        detail=True,
+        methods=["post", "delete"],
+        permission_classes=[IsAuthenticated],
+    )
+    def subscribe(self, request, id=None):
+        author_to_follow = get_object_or_404(User, id=id)
+        current_user = request.user
 
-        paginator = self.pagination_class()
-        page = paginator.paginate_queryset(subscriptions, request)
-
-        recipes_limit = request.query_params.get("recipes_limit")
-        if recipes_limit:
-            try:
-                recipes_limit = int(recipes_limit)
-                if recipes_limit < 0:
-                    recipes_limit = None
-            except (ValueError, TypeError):
-                recipes_limit = None
-
-        serializer = SubscriptionSerializer(
-            page,
-            many=True,
-            context={"request": request, "recipes_limit": recipes_limit},
-        )
-
-        return paginator.get_paginated_response(serializer.data)
-
-
-User = get_user_model()
-
-
-class UserView(APIView):
-    permission_classes = [AllowAny]
-
-    def get(self, request, *args, **kwargs):
-        queryset = User.objects.all()
-        paginator = PageNumberPagination()
-        paginator.page_size = 6
-        paginator.page_size_query_param = "limit"
-        paginator.max_page_size = 100
-        page = paginator.paginate_queryset(queryset, request)
-
-        serializer = UserSerializer(
-            page, many=True, context={"request": request, "action": "list"}
-        )
-        return paginator.get_paginated_response(serializer.data)
-
-    def post(self, request, *args, **kwargs):
-        serializer = UserSerializer(
-            data=request.data, context={"action": "create"}
-        )
-        if serializer.is_valid():
-            serializer.save()
+        if current_user == author_to_follow:
             return Response(
-                data=serializer.data,
-                status=status.HTTP_201_CREATED,
-            )
-        return Response(
-            data=serializer.errors,
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-
-
-class SingleUserView(APIView):
-    permission_classes = [AllowAny]
-
-    def get(self, request, user_id, *args, **kwargs):
-        try:
-            user = User.objects.get(id=user_id)
-            serializer = UserSerializer(user, context={"request": request})
-            return Response(serializer.data)
-        except User.DoesNotExist:
-            return Response(
-                {"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND
-            )
-
-
-class CustomTokenCreateView(APIView):
-    permission_classes = [AllowAny]
-
-    def post(self, request, *args, **kwargs):
-        serializer = TokenSerializer(data=request.data)
-        if serializer.is_valid():
-            return Response(
-                data={"auth_token": serializer.validated_data["auth_token"]},
-                status=status.HTTP_200_OK,
-            )
-        return Response(
-            data=serializer.errors, status=status.HTTP_400_BAD_REQUEST
-        )
-
-
-class CustomTokenDestroyView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request, *args, **kwargs):
-        request.user.auth_token.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
-
-class CurrentUserView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request, *args, **kwargs):
-        serializer = UserSerializer(request.user, context={"request": request})
-        return Response(serializer.data)
-
-
-class SubscriptionView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request, user_id, *args, **kwargs):
-        try:
-            author = User.objects.get(id=user_id)
-            if request.user == author:
-                return Response(
-                    {"detail": "Cannot subscribe to yourself"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            subscription, created = Subscription.objects.get_or_create(
-                subscriber=request.user, author=author
-            )
-
-            if not created:
-                return Response(
-                    {"detail": "Already subscribed"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            recipes_limit = request.query_params.get("recipes_limit")
-            if recipes_limit:
-                try:
-                    recipes_limit = int(recipes_limit)
-                    if recipes_limit < 0:
-                        recipes_limit = None
-                except (ValueError, TypeError):
-                    recipes_limit = None
-
-            subscription = request.user.subscriptions.filter(
-                author=author
-            ).first()
-
-            if not subscription:
-                subscription = Subscription.objects.create(
-                    subscriber=request.user, author=author
-                )
-
-            serializer = SubscriptionSerializer(
-                subscription,
-                context={"request": request, "recipes_limit": recipes_limit},
-            )
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-        except User.DoesNotExist:
-            return Response(
-                {"detail": "User not found"}, status=status.HTTP_404_NOT_FOUND
-            )
-
-    def delete(self, request, user_id, *args, **kwargs):
-        try:
-            author = User.objects.get(id=user_id)
-            if request.user == author:
-                return Response(
-                    {"detail": "Cannot unsubscribe from yourself"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            subscription = request.user.subscriptions.filter(
-                author=author
-            ).first()
-
-            if not subscription:
-                return Response(
-                    {"detail": "Not subscribed"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            subscription.delete()
-            return Response(status=status.HTTP_204_NO_CONTENT)
-
-        except User.DoesNotExist:
-            return Response(
-                {"detail": "User not found"}, status=status.HTTP_404_NOT_FOUND
-            )
-
-
-class PasswordResetView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request, *args, **kwargs):
-        serializer = PasswordResetSerializer(data=request.data)
-        if serializer.is_valid():
-            current_password = serializer.validated_data.get(
-                "current_password"
-            )
-            new_password = serializer.validated_data.get("new_password")
-
-            if not request.user.check_password(current_password):
-                return Response(
-                    {"current_password": ["Current password is incorrect"]},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            request.user.set_password(new_password)
-            request.user.save()
-
-            request.user.auth_token.delete()
-
-            return Response(status=status.HTTP_204_NO_CONTENT)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-class AvatarView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def put(self, request, *args, **kwargs):
-        return self.update_avatar(request)
-
-    def patch(self, request, *args, **kwargs):
-        return self.update_avatar(request)
-
-    def update_avatar(self, request):
-        if "avatar" not in request.data:
-            return Response(
-                {"detail": "Avatar field is required"},
+                {"detail": "You cannot subscribe to yourself"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        serializer = UserSerializer(
-            request.user,
-            data=request.data,
-            partial=True,
+        if request.method == "POST":
+            if Subscription.objects.filter(
+                subscriber=current_user, author=author_to_follow
+            ).exists():
+                return Response(
+                    {"detail": "You are already subscribed to this user"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            Subscription.objects.create(
+                subscriber=current_user, author=author_to_follow
+            )
+            serializer = UserWithRecipesSerializer(
+                author_to_follow, context={"request": request}
+            )
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+        elif request.method == "DELETE":
+            subscription = Subscription.objects.filter(
+                subscriber=current_user, author=author_to_follow
+            )
+            if not subscription.exists():
+                return Response(
+                    {"detail": "You are not subscribed to this user"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            subscription.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=False, methods=["get"])
+    def subscriptions(self, request):
+        subscriptions = request.user.subscriptions.select_related(
+            "author"
+        ).all()
+        authors = [sub.author for sub in subscriptions]
+
+        page = self.paginate_queryset(authors)
+        if page is not None:
+            serializer = SubscriptionsSerializer(
+                page,
+                many=True,
+                context={"request": request},
+            )
+            return self.get_paginated_response(serializer.data)
+
+        serializer = SubscriptionsSerializer(
+            authors,
+            many=True,
             context={"request": request},
         )
-        if serializer.is_valid():
-            serializer.save()
-            return Response(
-                {"avatar": serializer.data.get("avatar")},
-                status=status.HTTP_200_OK,
-            )
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return Response(serializer.data)
 
-    def delete(self, request, *args, **kwargs):
-        request.user.avatar.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+    @action(
+        detail=False,
+        methods=["put", "delete"],
+        permission_classes=[IsAuthenticated],
+        serializer_class=UserAvatarSerializer,
+        url_path="me/avatar",
+    )
+    def avatar(self, request):
+        user = request.user
+        if request.method == "PUT":
+            serializer = self.get_serializer(user, data=request.data)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(
+                serializer.errors, status=status.HTTP_400_BAD_REQUEST
+            )
+        elif request.method == "DELETE":
+            if user.avatar:
+                user.avatar.delete()
+                return Response(status=status.HTTP_204_NO_CONTENT)
+            return Response(
+                {"detail": "Avatar not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)

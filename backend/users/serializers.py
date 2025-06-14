@@ -1,204 +1,86 @@
-import re
-
-from django.contrib.auth import authenticate, get_user_model
-from django.core.validators import RegexValidator
-from django.utils.translation import gettext_lazy as _
+from django.contrib.auth import get_user_model
+from djoser.serializers import UserSerializer
+from drf_extra_fields.fields import Base64ImageField
 from recipes.serializers import RecipeSerializer
 from rest_framework import serializers
-from rest_framework.authtoken.models import Token
-from rest_framework.validators import UniqueValidator
 
-from .fields import Base64ImageField
 from .models import Subscription
 
 User = get_user_model()
 
 
-class SubscriptionSerializer(serializers.ModelSerializer):
-    recipes = serializers.SerializerMethodField()
-    recipes_count = serializers.SerializerMethodField()
+class UserProfileSerializer(UserSerializer):
     is_subscribed = serializers.SerializerMethodField()
+    avatar = Base64ImageField(required=False)
 
-    class Meta:
-        model = Subscription
-        fields = (
-            "id",
-            "recipes",
-            "recipes_count",
+    class Meta(UserSerializer.Meta):
+        fields = UserSerializer.Meta.fields + (
             "is_subscribed",
+            "avatar",
         )
-
-    def to_representation(self, instance):
-        data = super().to_representation(instance)
-        author_data = UserSerializer(
-            instance.author, context=self.context
-        ).data
-        data.update(
-            {
-                "username": author_data["username"],
-                "first_name": author_data["first_name"],
-                "last_name": author_data["last_name"],
-                "email": author_data["email"],
-                "avatar": author_data.get("avatar", None),
-            }
-        )
-        return data
 
     def get_is_subscribed(self, obj):
-        user = self.context["request"].user
-        return user.subscriptions.filter(author=obj.author).exists()
-
-    def get_recipes_count(self, obj):
-        return obj.author.recipes.count()
-
-    def get_recipes(self, obj):
-        recipes_limit = self.context.get("recipes_limit")
-        recipes = (
-            obj.author.recipes.all()[:recipes_limit]
-            if recipes_limit
-            else obj.author.recipes.all()
-        )
-
-        return RecipeSerializer(
-            recipes, many=True, fields=("id", "name", "image", "cooking_time")
-        ).data
+        request = self.context.get("request", None)
+        if not request or not request.user.is_authenticated:
+            return False
+        if request.user == obj:
+            return False
+        return Subscription.objects.filter(
+            subscriber=request.user,
+            author=obj,
+        ).exists()
 
 
-class UserSerializer(serializers.ModelSerializer):
-    email = serializers.EmailField(
-        required=True,
-        max_length=254,
-        validators=[
-            UniqueValidator(
-                queryset=User.objects.all(),
-                message="This email address is already registered.",
-            )
-        ],
-    )
-    username = serializers.CharField(
-        required=True,
-        max_length=150,
-        validators=[
-            UniqueValidator(
-                queryset=User.objects.all(),
-                message="This username is already taken.",
-            ),
-            RegexValidator(
-                regex=r"^[\w.@+-]+$",
-                message=(
-                    "Username must contain letters, digits, and @/./+/-/_"
-                ),
-            ),
-        ],
-    )
-    first_name = serializers.CharField(required=True, max_length=150)
-    last_name = serializers.CharField(required=True, max_length=150)
-    password = serializers.CharField(
-        write_only=True, required=True, style={"input_type": "password"}
-    )
-
-    avatar = Base64ImageField(required=False, allow_null=True)
+class UserAvatarSerializer(serializers.ModelSerializer):
+    avatar = Base64ImageField(required=True)
 
     class Meta:
         model = User
-        fields = (
-            "id",
-            "username",
-            "email",
-            "first_name",
-            "last_name",
-            "password",
-            "avatar",
+        fields = ("avatar",)
+
+
+class SubscriptionsSerializer(UserProfileSerializer):
+    recipes_count = serializers.SerializerMethodField()
+    recipes = serializers.SerializerMethodField()
+
+    class Meta(UserProfileSerializer.Meta):
+        fields = UserProfileSerializer.Meta.fields + (
+            "recipes_count",
+            "recipes",
         )
-        extra_kwargs = {"password": {"write_only": True}}
 
-    def to_representation(self, instance):
-        if self.context.get("action") == "create":
-            return {
-                "id": instance.id,
-                "username": instance.username,
-                "email": instance.email,
-                "first_name": instance.first_name,
-                "last_name": instance.last_name,
-            }
+    def get_recipes_count(self, obj):
+        return obj.recipes.count()
+
+    def get_recipes(self, obj):
         request = self.context.get("request")
-        is_subscribed = False
-        if request and request.user.is_authenticated:
-            is_subscribed = instance.subscribers.filter(
-                subscriber=request.user
-            ).exists()
-
-        return {
-            "id": instance.id,
-            "username": instance.username,
-            "first_name": instance.first_name,
-            "last_name": instance.last_name,
-            "email": instance.email,
-            "is_subscribed": is_subscribed,
-            "avatar": instance.avatar.url if instance.avatar else None,
-        }
-
-    def validate_username(self, value):
-        if not re.match(r"^[\w.@+-]+$", value):
-            raise serializers.ValidationError(
-                _("Username must contain only letters, digits, and @/./+/-/_")
-            )
-        return value
-
-    def create(self, validated_data):
-        password = validated_data.pop("password")
-        user = User(**validated_data)
-        user.set_password(password)
-        user.save()
-        return user
+        limit = request.query_params.get("recipes_limit")
+        qs = obj.recipes.all()
+        if limit and limit.isdigit():
+            qs = qs[: int(limit)]
+        return RecipeSerializer(
+            qs, many=True, context={"request": request}
+        ).data
 
 
-class TokenSerializer(serializers.Serializer):
-    auth_token = serializers.CharField(read_only=True)
-    email = serializers.EmailField(write_only=True)
-    password = serializers.CharField(
-        write_only=True, style={"input_type": "password"}
+class UserWithRecipesSerializer(UserProfileSerializer):
+    recipes = serializers.SerializerMethodField()
+    recipes_count = serializers.IntegerField(
+        source="recipes.count", read_only=True
     )
 
-    def validate(self, data):
-        email = data.get("email")
-        password = data.get("password")
+    class Meta(UserProfileSerializer.Meta):
+        model = User
+        fields = UserProfileSerializer.Meta.fields + (
+            "recipes",
+            "recipes_count",
+        )
+        read_only_fields = fields
 
-        if not email or not password:
-            raise serializers.ValidationError(
-                _("Email and password are required.")
-            )
-
-        user = authenticate(email=email, password=password)
-        if not user:
-            raise serializers.ValidationError(
-                _("Unable to authenticate with provided credentials.")
-            )
-
-        token, created = Token.objects.get_or_create(user=user)
-        return {"auth_token": token.key}
-
-
-class PasswordResetSerializer(serializers.Serializer):
-    current_password = serializers.CharField(
-        write_only=True, style={"input_type": "password"}, required=True
-    )
-    new_password = serializers.CharField(
-        write_only=True, style={"input_type": "password"}, required=True
-    )
-
-    def validate(self, data):
-        current_password = data.get("current_password")
-        new_password = data.get("new_password")
-
-        if not current_password or not new_password:
-            raise serializers.ValidationError(
-                _("Both current and new passwords are required.")
-            )
-
-        if current_password == new_password:
-            raise serializers.ValidationError(
-                _("New password must be different from current password.")
-            )
-
-        return data
+    def get_recipes(self, user):
+        request = self.context.get("request")
+        limit = request.query_params.get("recipes_limit")
+        qs = user.recipes.all()
+        if limit is not None and limit.isdigit():
+            qs = qs[: int(limit)]
+        return RecipeSerializer(qs, many=True, context=self.context).data
