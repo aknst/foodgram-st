@@ -3,6 +3,7 @@ from io import BytesIO
 
 from django.db import models
 from django.http import FileResponse
+from django.shortcuts import get_object_or_404, redirect
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -151,7 +152,11 @@ class RecipeViewSet(viewsets.ModelViewSet):
         permission_classes=[AllowAny],
     )
     def get_link(self, request, pk=None):
-        # Редирект по пути /s/<id> реализован на уровне nginx
         recipe = self.get_object()
         short_url = request.build_absolute_uri(f"/s/{recipe.id}")
         return Response({"short-link": short_url})
+
+
+def redirect_short_link(request, recipe_id):
+    recipe = get_object_or_404(Recipe, id=recipe_id)
+    return redirect(f"/recipes/{recipe.id}")
