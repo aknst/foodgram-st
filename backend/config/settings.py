@@ -22,7 +22,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Load environment variables from infra directory
 load_dotenv(os.path.join(BASE_DIR.parent, "infra", ".env"))
 
-DEBUG = True
+DEBUG = os.getenv("DEBUG", "False") == "True"
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
@@ -118,11 +119,7 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticatedOrReadOnly",
     ),
-    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.LimitOffsetPagination",  # noqa: E501
-    "PAGE_SIZE": 6,
-    "PAGE_SIZE_QUERY_PARAM": "limit",
-    "MAX_PAGE_SIZE": 100,
-    "PAGE_SIZE_PARAM": "limit",
+    "DEFAULT_PAGINATION_CLASS": "config.pagination.LimitAsPageNumberPagination",  # noqa: E501
 }
 
 DJOSER = {

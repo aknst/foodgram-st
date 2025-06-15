@@ -3,7 +3,6 @@ from django.shortcuts import get_object_or_404
 from djoser.views import UserViewSet
 from rest_framework import status
 from rest_framework.decorators import action
-from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
@@ -20,7 +19,6 @@ User = get_user_model()
 
 class UserView(UserViewSet):
     serializer_class = UserProfileSerializer
-    pagination_class = LimitOffsetPagination
 
     def get_permissions(self):
         if self.action == "me":

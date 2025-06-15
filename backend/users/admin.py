@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.contrib.admin import display
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.db.models import Count
 from django.utils.safestring import mark_safe
@@ -113,6 +114,7 @@ class UserAdmin(BaseUserAdmin):
             subscriber_count=Count("subscriptions_authors"),
         )
 
+    @display(description="Аватар")
     @mark_safe
     def avatar_html(self, obj):
         if obj.avatar:
@@ -123,45 +125,33 @@ class UserAdmin(BaseUserAdmin):
             )
         return "-"
 
-    avatar_html.short_description = "Аватар"
-
+    @display(description="Имя пользователя")
     def full_name(self, obj):
         return obj.get_full_name()
 
-    full_name.short_description = "Имя пользователя"
-
+    @display(description="Кол-во рецептов")
     def recipe_count(self, obj):
         return obj.recipes.count()
 
-    recipe_count.short_description = "Кол-во рецептов"
-
+    @display(description="Подписки")
     def subscription_count(self, obj):
         return obj.subscriptions.count()
 
-    subscription_count.short_description = "Подписки"
-
+    @display(description="Подписчики")
     def subscriber_count(self, obj):
         return obj.subscriptions_authors.count()
 
-    subscriber_count.short_description = "Подписчики"
-
+    @display(boolean=True, description="Есть рецепты")
     def has_recipes(self, obj):
         return obj.has_recipes > 0
 
-    has_recipes.boolean = True
-    has_recipes.short_description = "Есть рецепты"
-
+    @display(boolean=True, description="Есть подписки")
     def has_subscriptions(self, obj):
         return obj.has_subscriptions > 0
 
-    has_subscriptions.boolean = True
-    has_subscriptions.short_description = "Есть подписки"
-
+    @display(boolean=True, description="Есть подписчики")
     def has_subscribers(self, obj):
         return obj.has_subscribers > 0
-
-    has_subscribers.boolean = True
-    has_subscribers.short_description = "Есть подписчики"
 
 
 @admin.register(Subscription)
