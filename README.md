@@ -15,25 +15,47 @@ Foodgram - это веб-приложение для публикации и п�
 
 ## Установка и запуск
 
+### Клонирование репозитория
+
+```bash
+git clone https://github.com/aknst/foodgram-st.git
+```
+
+### Настройка окружения
+
+Создайте файл `.env` в директории `infra`:
+```
+DEBUG=True
+
+DATABASE_ENGINE=django.db.backends.postgresql
+DATABASE_NAME=foodgram_db
+DATABASE_USER=postgres
+DATABASE_PASSWORD=postgres
+DATABASE_HOST=db
+DATABASE_PORT=5432
+
+CORS_ORIGIN_ALLOW_ALL=True
+
+SECRET_KEY=secretkey
+ALLOWED_HOSTS=localhost,127.0.0.1,host.docker.internal
+```
+
 ### Локальная установка
 
 1. Установите зависимости:
    ```bash
+   cd backend
    pip install -r requirements.txt
    ```
 
-2. Создайте файл `.env` в директории `backend`:
-   ```
-   DATABASE_NAME=foodgram
-   DATABASE_USER=postgres
-   DATABASE_PASSWORD=postgres
-   DATABASE_HOST=localhost
-   DATABASE_PORT=5432
-   ```
-
-3. Примените миграции:
+2. Примените миграции:
    ```bash
    python manage.py migrate
+   ```
+
+3. Импортируйте ингредиенты:
+   ```bash
+   python manage.py load_ingredients
    ```
 
 4. Запустите сервер:
@@ -43,50 +65,32 @@ Foodgram - это веб-приложение для публикации и п�
 
 ### Установка с помощью Docker
 
-1. Установите Docker и Docker Compose
-
-2. Создайте файл `.env` в директории `infra`:
-   ```
-   DATABASE_NAME=foodgram
-   DATABASE_USER=postgres
-   DATABASE_PASSWORD=postgres
-   DATABASE_PORT=5432
-   ```
-
-3. Запустите контейнеры:
+1. Запустите контейнеры:
    ```bash
-   docker-compose up -d
+   cd infra
+   docker compose up -d
    ```
+   
+   После запуска backend-контейнера автоматически выполнится (согласно `docker-compose.yml`):
+   - Применение миграций
+   - Импорт ингредиентов
+   - Сборка статических файлов
+   - Запуск сервера на порту 8000
 
-4. После запуска контейнеров, проверьте статус:
+2. Для создания учетной записи администратора необходимо выполнить:
    ```bash
-   docker-compose ps
+   docker exec -it foodgram-backend bash
+   python manage.py createsuperuser
    ```
    
 ## Доступ к сервисам
 
-После запуска контейнеров:
-- Frontend: http://localhost:80
-- Backend: http://localhost:80/api/
-- API документация: http://localhost:80/api/docs/
-- Admin панель: http://localhost:80/admin/
+После запуска контейнеров доступны следующие сервисы:
+- [Frontend](http://localhost:80)
+- [Backend](http://localhost:80/api/)
+- [Admin панель](http://localhost:80/admin/)
+- [API документация](http://localhost:80/api/docs/)
 
-## Обслуживание
+## Автор
 
-### Остановка сервисов
-
-```bash
-docker-compose down
-```
-
-### Перезапуск сервисов
-
-```bash
-docker-compose restart
-```
-
-### Просмотр логов
-
-```bash
-docker-compose logs -f
-```
+Арефьев К. В. — [GitHub](https://github.com/aknst) | konstns64@yandex.ru
