@@ -1,7 +1,85 @@
 from django.conf import settings
+from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.validators import UnicodeUsernameValidator
 from django.core.validators import MinValueValidator
 from django.db import models
-from ingredients.models import Ingredient
+
+
+class User(AbstractUser):
+    email = models.EmailField(
+        "Адрес электронной почты",
+        unique=True,
+        max_length=254,
+    )
+    username = models.CharField(
+        "Юзернейм",
+        unique=True,
+        max_length=150,
+        validators=[
+            UnicodeUsernameValidator(),
+        ],
+    )
+    first_name = models.CharField("Имя", max_length=150)
+    last_name = models.CharField("Фамилия", max_length=150)
+    avatar = models.ImageField(
+        "Ссылка на аватар", upload_to="avatars/", null=True, blank=True
+    )
+
+    USERNAME_FIELD = "email"
+    REQUIRED_FIELDS = ["username", "first_name", "last_name"]
+
+    class Meta:
+        verbose_name = "Пользователь"
+        verbose_name_plural = "Пользователи"
+        ordering = ("username",)
+
+    def get_full_name(self):
+        return f"{self.first_name} {self.last_name}"
+
+
+class Subscription(models.Model):
+    subscriber = models.ForeignKey(
+        User,
+        related_name="subscriptions",
+        on_delete=models.CASCADE,
+        verbose_name="Подписчик",
+    )
+    author = models.ForeignKey(
+        User,
+        related_name="subscriptions_authors",
+        on_delete=models.CASCADE,
+        verbose_name="Автор",
+    )
+
+    class Meta:
+        verbose_name = "Подписка"
+        verbose_name_plural = "Подписки"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["subscriber", "author"], name="unique_subscription"
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(subscriber=models.F("author")),
+                name="prevent_self_subscription",
+            ),
+        ]
+
+
+class Ingredient(models.Model):
+    name = models.CharField(
+        max_length=128, verbose_name="Название ингредиента"
+    )
+    measurement_unit = models.CharField(
+        max_length=64, verbose_name="Единица измерения"
+    )
+
+    class Meta:
+        verbose_name = "Ингредиент"
+        verbose_name_plural = "Ингредиенты"
+        ordering = ("name",)
+
+    def __str__(self):
+        return self.name
 
 
 class Recipe(models.Model):
@@ -9,7 +87,7 @@ class Recipe(models.Model):
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name="recipes",
+        related_name="authored_recipes",
         verbose_name="Автор",
     )
     text = models.TextField("Описание")
@@ -20,7 +98,7 @@ class Recipe(models.Model):
     ingredients = models.ManyToManyField(
         Ingredient,
         through="RecipeIngredient",
-        related_name="recipes",
+        related_name="used_in_recipes",
         verbose_name="Ингредиенты",
     )
     pub_date = models.DateTimeField("Дата публикации", auto_now_add=True)
@@ -44,7 +122,7 @@ class RecipeIngredient(models.Model):
     ingredient = models.ForeignKey(
         Ingredient,
         on_delete=models.CASCADE,
-        related_name="recipe_ingredients",
+        related_name="recipes_used_in",
         verbose_name="Ингредиент",
     )
     amount = models.PositiveSmallIntegerField(
@@ -53,7 +131,7 @@ class RecipeIngredient(models.Model):
 
     class Meta:
         verbose_name = "Ингредиент рецепта"
-        verbose_name_plural = "Ингредиенты рецепта"
+        verbose_name_plural = "Ингредиенты рецептов"
         constraints = [
             models.UniqueConstraint(
                 fields=["recipe", "ingredient"],
@@ -61,9 +139,6 @@ class RecipeIngredient(models.Model):
             )
         ]
         ordering = ["ingredient__name"]
-
-    def __str__(self):
-        return f"{self.ingredient.name} в {self.recipe.name}"
 
 
 class RecipeAssociation(models.Model):
@@ -86,9 +161,6 @@ class RecipeAssociation(models.Model):
                 name="%(app_label)s_%(class)s_unique",
             )
         ]
-
-    def __str__(self):
-        return f"{self.user.username} - {self.recipe.name}"
 
 
 class Favorite(RecipeAssociation):
