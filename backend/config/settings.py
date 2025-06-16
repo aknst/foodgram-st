@@ -73,14 +73,13 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework.authtoken",
     "djoser",
-    "users",
-    "ingredients",
     "recipes",
 ]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.locale.LocaleMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -108,7 +107,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "config.wsgi.application"
 
-AUTH_USER_MODEL = "users.User"
+AUTH_USER_MODEL = "recipes.User"
 
 AUTHENTICATION_BACKENDS = ("django.contrib.auth.backends.ModelBackend",)
 
@@ -119,7 +118,7 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticatedOrReadOnly",
     ),
-    "DEFAULT_PAGINATION_CLASS": "config.pagination.LimitAsPageNumberPagination",  # noqa: E501
+    "DEFAULT_PAGINATION_CLASS": "api.pagination.LimitAsPageNumberPagination",  # noqa: E501
 }
 
 DJOSER = {
@@ -129,8 +128,8 @@ DJOSER = {
     "HIDE_USERS": False,
     "SERIALIZERS": {
         "user_create": "djoser.serializers.UserCreateSerializer",
-        "user": "users.serializers.UserProfileSerializer",
-        "current_user": "users.serializers.UserProfileSerializer",
+        "user": "api.serializers.UserProfileSerializer",
+        "current_user": "api.serializers.UserProfileSerializer",
     },
     "PERMISSIONS": {
         "user": ["rest_framework.permissions.IsAuthenticatedOrReadOnly"],
@@ -189,9 +188,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = "en-us"
+LANGUAGE_CODE = "ru-ru"
 
-TIME_ZONE = "UTC"
+TIME_ZONE = "Europe/Moscow"
 
 USE_I18N = True
 
