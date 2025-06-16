@@ -12,7 +12,6 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         try:
             data_dir = Path(settings.BASE_DIR).parent / "data"
-            print(settings.BASE_DIR)
             json_file = data_dir / "ingredients.json"
 
             with open(json_file, "r", encoding="utf-8") as f:

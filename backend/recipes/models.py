@@ -172,8 +172,8 @@ class Favorite(RecipeAssociation):
     )
 
     class Meta(RecipeAssociation.Meta):
-        verbose_name = "Избранный рецепт"
-        verbose_name_plural = "Избранные рецепты"
+        verbose_name = "Рецепт в избранном"
+        verbose_name_plural = "Рецепты в избранном"
         db_table = "recipes_favorite"
 
 
