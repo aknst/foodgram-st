@@ -299,5 +299,8 @@ class RecipeViewSet(viewsets.ModelViewSet):
 
 
 def redirect_short_link(request, recipe_id):
-    recipe = get_object_or_404(Recipe, id=recipe_id)
-    return redirect(f"/recipes/{recipe.id}")
+    try:
+        recipe = Recipe.objects.get(id=recipe_id)
+        return redirect(f"/recipes/{recipe.id}")
+    except (Recipe.DoesNotExist, ValueError):
+        return redirect("/not-found")
