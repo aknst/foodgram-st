@@ -10,34 +10,29 @@ class Command(BaseCommand):
     help = "Загрузка ингредиентов из JSON файла"
 
     def handle(self, *args, **options):
-        try:
-            data_dir = Path(settings.BASE_DIR).parent / "data"
-            json_file = data_dir / "ingredients.json"
+        data_dir = Path(settings.BASE_DIR).parent / "data"
+        json_file = data_dir / "ingredients.json"
 
+        try:
             with open(json_file, "r", encoding="utf-8") as f:
                 ingredients_data = json.load(f)
 
-            existing = set(
-                Ingredient.objects.values_list("name", "measurement_unit")
+            new_objs = [Ingredient(**item) for item in ingredients_data]
+
+            created = Ingredient.objects.bulk_create(
+                new_objs,
+                ignore_conflicts=True,
             )
-
-            new_objs = [
-                Ingredient(
-                    name=item["name"],
-                    measurement_unit=item["measurement_unit"],
-                )
-                for item in ingredients_data
-                if (item["name"], item["measurement_unit"]) not in existing
-            ]
-
-            created = Ingredient.objects.bulk_create(new_objs)
 
             self.stdout.write(
                 self.style.SUCCESS(
-                    f"Успешно загружено {len(created)} новых ингредиентов"
+                    f"Успешно загружено {len(created)} ингредиентов"
                 )
             )
         except Exception as e:
             self.stdout.write(
-                self.style.ERROR(f"Ошибка загрузки ингредиентов: {e}")
+                self.style.ERROR(
+                    f"Ошибка загрузки ингредиентов из файла "
+                    f"{json_file.name}: {e}"
+                )
             )

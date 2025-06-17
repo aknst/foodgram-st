@@ -1,9 +1,8 @@
 from datetime import datetime
-from io import BytesIO
 
 from django.db import models
 from django.http import FileResponse
-from django.shortcuts import get_object_or_404, redirect
+from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from djoser.views import UserViewSet as DjoserUserViewSet
 from recipes.models import (
@@ -32,7 +31,6 @@ from .serializers import (
     RecipeListSerializer,
     RecipeSerializer,
     RecipeWriteSerializer,
-    SubscriptionsSerializer,
     UserAvatarSerializer,
     UserProfileSerializer,
     UserWithRecipesSerializer,
@@ -56,16 +54,17 @@ class UserViewSet(DjoserUserViewSet):
         author_to_follow = get_object_or_404(User, id=id)
         current_user = request.user
 
-        if current_user == author_to_follow:
-            return Response(
-                {"detail": "Вы не можете подписаться на себя."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
         if request.method == "POST":
-            if Subscription.objects.filter(
-                subscriber=current_user, author=author_to_follow
-            ).exists():
+            if current_user == author_to_follow:
+                return Response(
+                    {"detail": "Вы не можете подписаться на себя."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            subscription, created = Subscription.objects.get_or_create(
+                subscriber=current_user,
+                author=author_to_follow,
+            )
+            if not created:
                 return Response(
                     {
                         "detail": (
@@ -75,30 +74,26 @@ class UserViewSet(DjoserUserViewSet):
                     },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            Subscription.objects.create(
-                subscriber=current_user, author=author_to_follow
-            )
             serializer = UserWithRecipesSerializer(
                 author_to_follow, context={"request": request}
             )
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-        elif request.method == "DELETE":
-            subscription = Subscription.objects.filter(
-                subscriber=current_user, author=author_to_follow
+        subscription_qs = Subscription.objects.filter(
+            subscriber=current_user, author=author_to_follow
+        )
+        if not subscription_qs.exists():
+            return Response(
+                {
+                    "detail": (
+                        f"Вы не подписаны на пользователя "
+                        f"'{author_to_follow.username}'"
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
             )
-            if not subscription.exists():
-                return Response(
-                    {
-                        "detail": (
-                            f"Вы не подписаны на пользователя "
-                            f"'{author_to_follow.username}'"
-                        )
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            subscription.delete()
-            return Response(status=status.HTTP_204_NO_CONTENT)
+        subscription_qs.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=False, methods=["get"])
     def subscriptions(self, request):
@@ -108,20 +103,13 @@ class UserViewSet(DjoserUserViewSet):
         authors = [sub.author for sub in subscriptions]
 
         page = self.paginate_queryset(authors)
-        if page is not None:
-            serializer = SubscriptionsSerializer(
+        return self.get_paginated_response(
+            UserWithRecipesSerializer(
                 page,
                 many=True,
                 context={"request": request},
-            )
-            return self.get_paginated_response(serializer.data)
-
-        serializer = SubscriptionsSerializer(
-            authors,
-            many=True,
-            context={"request": request},
+            ).data
         )
-        return Response(serializer.data)
 
     @action(
         detail=False,
@@ -238,9 +226,8 @@ class RecipeViewSet(viewsets.ModelViewSet):
             + "\n"
         )
 
-        buffer = BytesIO(content.encode("utf-8"))
         return FileResponse(
-            buffer,
+            content,
             as_attachment=True,
             filename="shopping_cart.txt",
             content_type="text/plain",
@@ -293,14 +280,11 @@ class RecipeViewSet(viewsets.ModelViewSet):
         permission_classes=[AllowAny],
     )
     def get_link(self, request, pk=None):
-        recipe = self.get_object()
-        short_url = request.build_absolute_uri(f"/s/{recipe.id}")
+        exists = Recipe.objects.filter(pk=pk).exists()
+        if not exists:
+            return Response(
+                {"detail": "Рецепт не найден."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        short_url = request.build_absolute_uri(f"/s/{pk}")
         return Response({"short-link": short_url})
-
-
-def redirect_short_link(request, recipe_id):
-    try:
-        recipe = Recipe.objects.get(id=recipe_id)
-        return redirect(f"/recipes/{recipe.id}")
-    except (Recipe.DoesNotExist, ValueError):
-        return redirect("/not-found")

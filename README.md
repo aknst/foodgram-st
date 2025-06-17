@@ -21,6 +21,10 @@ Foodgram - это веб-приложение для публикации и п�
 git clone https://github.com/aknst/foodgram-st.git
 ```
 
+```bash
+cd foodgram-st
+```
+
 ### Настройка окружения
 
 Создайте файл `.env` в директории `infra`:
@@ -93,4 +97,4 @@ ALLOWED_HOSTS=localhost,127.0.0.1,host.docker.internal
 
 ## Автор
 
-Арефьев К. В. — [GitHub](https://github.com/aknst) | konstns64@yandex.ru
+Арефьев К. В. — [GitHub](https://github.com/aknst) | [Email](mailto:konstns64@yandex.ru)

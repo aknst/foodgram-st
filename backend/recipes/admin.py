@@ -16,74 +16,52 @@ from .models import (
 )
 
 
-class HasRecipesFilter(admin.SimpleListFilter):
-    title = "Есть рецепты"
-    parameter_name = "has_recipes"
+class BooleanRelatedFieldFilter(admin.SimpleListFilter):
+    LOOKUP_CHOICES = (
+        ("yes", "Да"),
+        ("no", "Нет"),
+    )
+    related_field = None
 
     def lookups(self, request, model_admin):
-        return (
-            ("yes", "Да"),
-            ("no", "Нет"),
-        )
+        return self.LOOKUP_CHOICES
 
     def queryset(self, request, queryset):
-        if self.value() == "yes":
-            return queryset.filter(authored_recipes__isnull=False).distinct()
-        if self.value() == "no":
-            return queryset.filter(authored_recipes__isnull=True)
+        if not self.related_field:
+            return queryset
 
-
-class HasSubscriptionsFilter(admin.SimpleListFilter):
-    title = "Есть подписки"
-    parameter_name = "has_subscriptions"
-
-    def lookups(self, request, model_admin):
-        return (
-            ("yes", "Да"),
-            ("no", "Нет"),
-        )
-
-    def queryset(self, request, queryset):
-        if self.value() == "yes":
-            return queryset.filter(subscriptions__isnull=False).distinct()
-        if self.value() == "no":
-            return queryset.filter(subscriptions__isnull=True)
-
-
-class HasSubscribersFilter(admin.SimpleListFilter):
-    title = "Есть подписчики"
-    parameter_name = "has_subscribers"
-
-    def lookups(self, request, model_admin):
-        return (
-            ("yes", "Да"),
-            ("no", "Нет"),
-        )
-
-    def queryset(self, request, queryset):
         if self.value() == "yes":
             return queryset.filter(
-                subscriptions_authors__isnull=False
+                **{f"{self.related_field}__isnull": False}
             ).distinct()
         if self.value() == "no":
-            return queryset.filter(subscriptions_authors__isnull=True)
+            return queryset.filter(
+                **{f"{self.related_field}__isnull": True}
+            ).distinct()
 
 
-class IsUsedInRecipesFilter(admin.SimpleListFilter):
+class HasRecipesFilter(BooleanRelatedFieldFilter):
+    title = "Есть рецепты"
+    parameter_name = "has_recipes"
+    related_field = "recipes"
+
+
+class HasSubscriptionsFilter(BooleanRelatedFieldFilter):
+    title = "Есть подписки"
+    parameter_name = "has_subscriptions"
+    related_field = "subscriptions"
+
+
+class HasSubscribersFilter(BooleanRelatedFieldFilter):
+    title = "Есть подписчики"
+    parameter_name = "has_subscribers"
+    related_field = "subscriptions_authors"
+
+
+class IsUsedInRecipesFilter(BooleanRelatedFieldFilter):
     title = "Используется в рецептах"
     parameter_name = "is_used_in_recipes"
-
-    def lookups(self, request, model_admin):
-        return (
-            ("yes", "Да"),
-            ("no", "Нет"),
-        )
-
-    def queryset(self, request, queryset):
-        if self.value() == "yes":
-            return queryset.filter(used_in_recipes__isnull=False).distinct()
-        if self.value() == "no":
-            return queryset.filter(used_in_recipes__isnull=True)
+    related_field = "recipes"
 
 
 class CookingTimeFilter(admin.SimpleListFilter):
@@ -91,48 +69,46 @@ class CookingTimeFilter(admin.SimpleListFilter):
     parameter_name = "cooking_time"
 
     def lookups(self, request, model_admin):
-        recipes = Recipe.objects.all()
-        if not recipes.exists():
-            return (
-                ("quick", "Быстрые"),
-                ("medium", "Средние"),
-                ("slow", "Долгие"),
-            )
+        times = (
+            Recipe.objects.values_list("cooking_time", flat=True)
+            .distinct()
+            .order_by("cooking_time")
+        )
 
-        cooking_times = recipes.values_list("cooking_time", flat=True)
-        max_time = max(cooking_times)
+        if len(times) < 3:
+            return ()
 
-        quick_max = max_time * 0.33
-        medium_max = max_time * 0.66
+        n = len(times)
+        idx1 = n // 3
+        idx2 = (2 * n) // 3
+
+        self.threshold1 = times[idx1]
+        self.threshold2 = times[idx2]
 
         return (
+            ("quick", f"Быстрые (до {self.threshold1} мин)"),
             (
-                f"quick_{quick_max}",
-                f"Быстрые (до {quick_max:.0f} мин)",
+                "medium",
+                f"Средние ({self.threshold1 + 1}–{self.threshold2} мин)",
             ),
-            (
-                f"medium_{medium_max}",
-                f"Средние (до {medium_max:.0f} мин)",
-            ),
-            (
-                f"slow_{max_time}",
-                f"Долгие (более {medium_max:.0f} мин)",
-            ),
+            ("slow", f"Долгие (более {self.threshold2} мин)"),
         )
 
     def queryset(self, request, queryset):
-        if self.value():
-            value, max_time = self.value().split("_")
-            max_time = float(max_time)
-            if value == "quick":
-                return queryset.filter(cooking_time__lte=max_time)
-            elif value == "medium":
-                return queryset.filter(
-                    cooking_time__gt=max_time / 3,
-                    cooking_time__lte=max_time * 2 / 3,
-                )
-            elif value == "slow":
-                return queryset.filter(cooking_time__gt=max_time * 2 / 3)
+        value = self.value()
+        if not value:
+            return queryset
+
+        if value == "quick":
+            return queryset.filter(cooking_time__lte=self.threshold1)
+        elif value == "medium":
+            return queryset.filter(
+                cooking_time__gt=self.threshold1,
+                cooking_time__lte=self.threshold2,
+            )
+        elif value == "slow":
+            return queryset.filter(cooking_time__gt=self.threshold2)
+
         return queryset
 
 
@@ -185,7 +161,7 @@ class UserAdmin(BaseUserAdmin):
     def get_queryset(self, request):
         queryset = super().get_queryset(request)
         return queryset.annotate(
-            recipe_count=Count("authored_recipes"),
+            recipe_count=Count("recipes"),
             subscription_count=Count("subscriptions"),
             subscriber_count=Count("subscriptions_authors"),
         )
@@ -201,13 +177,13 @@ class UserAdmin(BaseUserAdmin):
             )
         return "-"
 
-    @display(description="Имя пользователя")
+    @display(description="Имя")
     def full_name(self, user):
         return user.get_full_name()
 
-    @display(description="Кол-во рецептов")
+    @display(description="Рецептов")
     def recipe_count(self, user):
-        return user.authored_recipes.count()
+        return user.recipes.count()
 
     @display(description="Подписки")
     def subscription_count(self, user):
@@ -216,18 +192,6 @@ class UserAdmin(BaseUserAdmin):
     @display(description="Подписчики")
     def subscriber_count(self, user):
         return user.subscriptions_authors.count()
-
-    @display(boolean=True, description="Есть рецепты")
-    def has_authored_recipes(self, user):
-        return user.has_authored_recipes > 0
-
-    @display(boolean=True, description="Есть подписки")
-    def has_subscriptions(self, user):
-        return user.has_subscriptions > 0
-
-    @display(boolean=True, description="Есть подписчики")
-    def has_subscribers(self, user):
-        return user.has_subscribers > 0
 
 
 @admin.register(Subscription)
@@ -255,13 +219,13 @@ class IngredientAdmin(admin.ModelAdmin):
     list_filter = ("measurement_unit", IsUsedInRecipesFilter)
     ordering = ("name",)
 
-    @admin.display(description="Количество рецептов")
+    @admin.display(description="Рецептов")
     def recipe_count(self, ingredient):
-        return ingredient.used_in_recipes.count()
+        return ingredient.recipes.count()
 
     @admin.display(boolean=True, description="Используется в рецептах")
     def is_used_in_recipes(self, ingredient):
-        return ingredient.used_in_recipes.exists()
+        return ingredient.recipes.exists()
 
 
 @admin.register(Recipe)
@@ -295,19 +259,12 @@ class RecipeAdmin(admin.ModelAdmin):
 
     @admin.display(description="Ингредиенты")
     def ingredients_list(self, recipe):
-        ingredients = recipe.recipe_ingredients.all()
-        if not ingredients:
-            return mark_safe("-пусто-")
-
-        items = "".join(
-            f"<li>"
-            f"{ingredient.ingredient.name} ({ingredient.amount} "
-            f"{ingredient.ingredient.measurement_unit})</li>"
-            for ingredient in ingredients
-        )
-
         return mark_safe(
-            f'<ul style="margin: 0; padding-left: 20px;">{items}</ul>'
+            "<br>".join(
+                f"{ingredient.ingredient.name} ({ingredient.amount} "
+                f"{ingredient.ingredient.measurement_unit})"
+                for ingredient in recipe.recipe_ingredients.all()
+            )
         )
 
     @admin.display(description="Изображение")
@@ -321,7 +278,7 @@ class RecipeAdmin(admin.ModelAdmin):
             )
         return "-пусто-"
 
-    @admin.display(description="Добавлений в избранное")
+    @admin.display(description="В избранном")
     def favorite_count(self, recipe):
         return recipe.favorite_set.count()
 

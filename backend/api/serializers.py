@@ -19,15 +19,16 @@ class UserProfileSerializer(UserSerializer):
         )
 
     def get_is_subscribed(self, obj):
-        request = self.context.get("request", None)
-        if not request or not request.user.is_authenticated:
-            return False
-        if request.user == obj:
-            return False
-        return Subscription.objects.filter(
-            subscriber=request.user,
-            author=obj,
-        ).exists()
+        request = self.context.get("request")
+        return (
+            request
+            and request.user.is_authenticated
+            and request.user != obj
+            and Subscription.objects.filter(
+                subscriber=request.user,
+                author=obj,
+            ).exists()
+        )
 
 
 class UserAvatarSerializer(serializers.ModelSerializer):
@@ -38,34 +39,10 @@ class UserAvatarSerializer(serializers.ModelSerializer):
         fields = ("avatar",)
 
 
-class SubscriptionsSerializer(UserProfileSerializer):
-    recipes = serializers.SerializerMethodField()
-    recipes_count = serializers.SerializerMethodField()
-
-    class Meta(UserProfileSerializer.Meta):
-        fields = UserProfileSerializer.Meta.fields + (
-            "recipes_count",
-            "recipes",
-        )
-
-    def get_recipes_count(self, user):
-        return user.authored_recipes.count()
-
-    def get_recipes(self, user):
-        request = self.context.get("request")
-        limit = request.query_params.get("recipes_limit")
-        qs = user.authored_recipes.all()
-        if limit and limit.isdigit():
-            qs = qs[: int(limit)]
-        return RecipeSerializer(
-            qs, many=True, context={"request": request}
-        ).data
-
-
 class UserWithRecipesSerializer(UserProfileSerializer):
     recipes = serializers.SerializerMethodField()
     recipes_count = serializers.IntegerField(
-        source="authored_recipes.count", read_only=True
+        source="recipes.count", read_only=True
     )
 
     class Meta(UserProfileSerializer.Meta):
@@ -77,9 +54,9 @@ class UserWithRecipesSerializer(UserProfileSerializer):
 
     def get_recipes(self, user):
         request = self.context.get("request")
-        limit = request.query_params.get("recipes_limit")
-        qs = user.authored_recipes.all()
-        if limit is not None and limit.isdigit():
+        limit = request.query_params.get("recipes_limit", "0")
+        qs = user.recipes.all()
+        if limit.isdigit():
             qs = qs[: int(limit)]
         return RecipeSerializer(qs, many=True, context=self.context).data
 
@@ -88,7 +65,6 @@ class IngredientSerializer(serializers.ModelSerializer):
     class Meta:
         model = Ingredient
         fields = ("id", "name", "measurement_unit")
-        read_only_fields = fields
 
 
 class RecipeSerializer(serializers.ModelSerializer):
@@ -174,12 +150,11 @@ class RecipeWriteSerializer(serializers.ModelSerializer):
         return recipe
 
     def update(self, instance, validated_data):
-        ingredients_data = validated_data.pop("ingredients", None)
-        recipe = super().update(instance, validated_data)
-        if ingredients_data is not None:
-            recipe.recipe_ingredients.all().delete()
-            self._save_ingredients(recipe, ingredients_data)
-        return recipe
+        ingredients_data = validated_data.pop("ingredients")
+        super().update(instance, validated_data)
+        instance.recipe_ingredients.all().delete()
+        self._save_ingredients(instance, ingredients_data)
+        return instance
 
     def to_representation(self, instance):
         return RecipeListSerializer(instance, context=self.context).data

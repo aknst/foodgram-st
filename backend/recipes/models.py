@@ -76,6 +76,12 @@ class Ingredient(models.Model):
     class Meta:
         verbose_name = "Ингредиент"
         verbose_name_plural = "Ингредиенты"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["name", "measurement_unit"],
+                name="unique_ingredient",
+            )
+        ]
         ordering = ("name",)
 
     def __str__(self):
@@ -87,7 +93,7 @@ class Recipe(models.Model):
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name="authored_recipes",
+        related_name="recipes",
         verbose_name="Автор",
     )
     text = models.TextField("Описание")
@@ -98,7 +104,7 @@ class Recipe(models.Model):
     ingredients = models.ManyToManyField(
         Ingredient,
         through="RecipeIngredient",
-        related_name="used_in_recipes",
+        related_name="recipes",
         verbose_name="Ингредиенты",
     )
     pub_date = models.DateTimeField("Дата публикации", auto_now_add=True)
@@ -122,7 +128,7 @@ class RecipeIngredient(models.Model):
     ingredient = models.ForeignKey(
         Ingredient,
         on_delete=models.CASCADE,
-        related_name="recipes_used_in",
+        related_name="recipe_ingredients",
         verbose_name="Ингредиент",
     )
     amount = models.PositiveSmallIntegerField(
@@ -151,6 +157,7 @@ class RecipeAssociation(models.Model):
         Recipe,
         on_delete=models.CASCADE,
         verbose_name="Рецепт",
+        related_name="%(class)s_set",
     )
 
     class Meta:
@@ -164,28 +171,12 @@ class RecipeAssociation(models.Model):
 
 
 class Favorite(RecipeAssociation):
-    recipe = models.ForeignKey(
-        Recipe,
-        on_delete=models.CASCADE,
-        related_name="favorite_set",
-        verbose_name="Рецепт",
-    )
-
     class Meta(RecipeAssociation.Meta):
         verbose_name = "Рецепт в избранном"
         verbose_name_plural = "Рецепты в избранном"
-        db_table = "recipes_favorite"
 
 
 class ShoppingCart(RecipeAssociation):
-    recipe = models.ForeignKey(
-        Recipe,
-        on_delete=models.CASCADE,
-        related_name="shoppingcart_set",
-        verbose_name="Рецепт",
-    )
-
     class Meta(RecipeAssociation.Meta):
         verbose_name = "Рецепт в корзине"
         verbose_name_plural = "Рецепты в корзине"
-        db_table = "recipes_shoppingcart"
